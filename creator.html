@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#142522" />
+    <title>Schooltopia Studio · 创建我的学校</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23142522'/%3E%3Cpath d='M13 45h38v6H13zM18 24h28v21H18z' fill='%23d09a39'/%3E%3Cpath d='M12 19h40v7H12z' fill='%23245f61'/%3E%3C/svg%3E" />
+    <link rel="stylesheet" href="admin.css" />
+    <link rel="stylesheet" href="creator.css" />
+    <link rel="preload" href="creator-3d.bundle.js" as="script" />
+  </head>
+  <body>
+    <header class="admin-topbar creator-topbar">
+      <div class="brand-block">
+        <span class="brand-mark" aria-hidden="true">S</span>
+        <div>
+          <strong>Schooltopia <span class="studio-word">Studio</span></strong>
+          <small>学校版本编辑器</small>
+        </div>
+      </div>
+      <div class="creator-top-actions">
+        <button id="creatorLanguageToggle" class="creator-audio-button language-toggle" type="button" data-lang-toggle>English</button>
+        <div class="creator-audio-controls" aria-label="声音设置">
+          <button id="creatorMusicToggle" class="creator-audio-button" type="button" aria-pressed="true" title="背景音乐：Gymnopédie No.1">
+            <span class="creator-music-mark" aria-hidden="true"></span>
+            <span id="creatorMusicLabel">音乐 开</span>
+          </button>
+          <button id="creatorSoundToggle" class="creator-audio-button" type="button" aria-pressed="true" title="创建器音效">
+            <span class="creator-sound-mark" aria-hidden="true"></span>
+            <span id="creatorSoundLabel">音效 开</span>
+          </button>
+        </div>
+        <a class="back-link creator-return-link" href="index.html">
+          <span class="game-return-mark" aria-hidden="true"></span>
+          <span>返回游戏</span>
+        </a>
+      </div>
+    </header>
+
+    <main>
+      <section id="creatorHero" class="creator-hero" aria-labelledby="creatorHeroTitle">
+        <div class="creator-scene-placeholder" aria-hidden="true">
+          <span class="placeholder-base"></span>
+          <span class="placeholder-track"></span>
+          <span class="placeholder-building building-a"></span>
+          <span class="placeholder-building building-b"></span>
+          <span class="placeholder-building building-c"></span>
+          <span class="placeholder-node node-a"></span>
+          <span class="placeholder-node node-b"></span>
+        </div>
+        <canvas id="creatorWorld3d" aria-hidden="true"></canvas>
+        <button id="retryCreator3d" class="retry-3d-button hidden" type="button">重新加载 3D</button>
+        <div class="hero-blueprint-grid" aria-hidden="true"></div>
+        <div class="hero-copy">
+          <p class="hero-kicker">SCHOOLTOPIA / CAMPUS STUDIO</p>
+          <h1 id="creatorHeroTitle">搭建你的<br />校园世界</h1>
+          <p>换一套校园模型、写入真实事件，再重新定义这所学校的生存规则。</p>
+          <a href="#schoolDockTitle" class="hero-start-link">开始创建</a>
+        </div>
+        <div class="hero-scene-meta" aria-hidden="true">
+          <span>MODEL 01</span>
+          <strong>LIVE CAMPUS</strong>
+          <small>12 WEEK SIMULATION</small>
+        </div>
+        <div class="hero-axis" aria-hidden="true"><i></i><i></i><i></i></div>
+      </section>
+
+      <div class="admin-shell creator-shell">
+
+      <p id="creatorStatus" class="status-line creator-status" aria-live="polite"></p>
+
+      <section class="school-dock" aria-labelledby="schoolDockTitle">
+        <div class="dock-heading">
+          <span class="section-index">01</span>
+          <div>
+            <h2 id="schoolDockTitle">打开你的学校工作台</h2>
+            <p>编辑凭证只保存在当前浏览器，其他玩家只能游玩，不能改动。</p>
+          </div>
+        </div>
+        <div class="dock-controls">
+          <label>
+            新学校名称
+            <input id="creatorSchoolName" maxlength="60" placeholder="例如：南山实验学校" />
+          </label>
+          <button id="createOwnedSchool" class="primary-button create-school-button" type="button">
+            <span class="school-create-mark" aria-hidden="true"></span>
+            <span>创建并进入工作台</span>
+          </button>
+          <div id="ownedSchoolWrap" class="owned-school-wrap hidden">
+            <span class="dock-or">或</span>
+            <label for="ownedSchoolSelect">继续编辑</label>
+            <select id="ownedSchoolSelect"></select>
+            <button id="loadOwnedSchool" type="button">打开</button>
+          </div>
+        </div>
+      </section>
+
+      <div id="creatorWorkspace" class="creator-workspace hidden">
+        <aside class="studio-rail" aria-label="编辑步骤">
+          <div class="rail-school">
+            <small>正在编辑</small>
+            <strong id="railSchoolName">Schooltopia</strong>
+            <span id="railEventCount">0 个校园事件</span>
+          </div>
+          <nav>
+            <a href="#appearancePanel"><span>02</span>学校外观</a>
+            <a href="#rulesPanel"><span>03</span>规则权重</a>
+            <a href="#eventsPanel"><span>04</span>剧情节点</a>
+            <a href="#sharePanel"><span>05</span>发布分享</a>
+          </nav>
+          <button id="resetOwnedSchool" class="reset-school-button" type="button">重置全部（含学校名称）</button>
+          <p>保留编辑权限，名称恢复为“未命名学校”，同时清空事件并恢复默认外观和权重。</p>
+        </aside>
+
+        <div class="studio-main">
+          <section id="appearancePanel" class="editor-section">
+            <div class="section-head">
+              <div>
+                <p class="section-kicker">Identity &amp; Theme</p>
+                <h2>学校信息与皮肤</h2>
+              </div>
+              <button id="saveCreatorConfig" class="primary-button" type="button">保存全部设置</button>
+            </div>
+
+            <div class="identity-fields">
+              <label>学校名称 <input id="creatorNameInput" maxlength="60" /></label>
+              <label>学校版本说明 <textarea id="creatorTaglineInput" rows="3" maxlength="140"></textarea></label>
+            </div>
+
+            <div class="theme-heading">
+              <h3>主题预设</h3>
+              <p>先选一套完整风格，也可以继续微调四种颜色。</p>
+            </div>
+            <div id="skinPresetGrid" class="skin-preset-grid"></div>
+
+            <details class="custom-colors">
+              <summary>自定义颜色</summary>
+              <div class="color-grid">
+                <label>主色 <input id="creatorPrimary" type="color" value="#245f61" /></label>
+                <label>强调色 <input id="creatorAccent" type="color" value="#d09a39" /></label>
+                <label>风险色 <input id="creatorDanger" type="color" value="#b64d3f" /></label>
+                <label>天空色 <input id="creatorSky" type="color" value="#10242b" /></label>
+              </div>
+            </details>
+          </section>
+
+          <section id="rulesPanel" class="editor-section">
+            <div class="section-head compact">
+              <div>
+                <p class="section-kicker">Rule Mixer</p>
+                <h2>规则权重</h2>
+                <p>1.00 是原版节奏；数值越高，对应机制越强。</p>
+              </div>
+            </div>
+            <div id="creatorWeightRows" class="weight-rows creator-weight-rows"></div>
+          </section>
+
+          <section id="eventsPanel" class="editor-section events-section">
+            <div class="section-head">
+              <div>
+                <p class="section-kicker">Story Generator</p>
+                <h2>真实事件转剧情节点</h2>
+                <p>输入真实校园事件生成三个初稿，再逐项修改选项、说明与属性变化。</p>
+              </div>
+            </div>
+            <div class="event-composer">
+              <label for="creatorEventPrompt">校园事件</label>
+              <textarea id="creatorEventPrompt" rows="4" maxlength="320" placeholder="例如：期中考试、社团汇演和小组展示撞在同一周。"></textarea>
+              <div class="generator-controls">
+                <label>
+                  适用路线
+                  <select id="creatorEventRoute">
+                    <option value="student">学生路线</option>
+                    <option value="teacher">教师路线</option>
+                    <option value="both">学生与教师</option>
+                  </select>
+                </label>
+                <button id="creatorGenerateEvent" class="primary-button" type="button">自动生成剧情节点</button>
+              </div>
+            </div>
+            <div class="table-wrap creator-event-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>事件名称</th>
+                    <th>路线</th>
+                    <th>触发率</th>
+                    <th>剧情节点</th>
+                    <th>启用</th>
+                    <th>操作</th>
+                  </tr>
+                </thead>
+                <tbody id="creatorEventTable"></tbody>
+              </table>
+            </div>
+            <p id="creatorEventEmpty" class="empty-state">还没有事件。写下第一件属于你学校的校园经历。</p>
+          </section>
+
+          <section id="sharePanel" class="editor-section share-section">
+            <div>
+              <p class="section-kicker">Publish</p>
+              <h2>进入游戏并分享</h2>
+              <p>专属链接会载入当前学校的皮肤、事件和变量权重。</p>
+            </div>
+            <div class="share-link-row">
+              <input id="schoolShareLink" readonly aria-label="学校专属游戏链接" />
+              <button id="copySchoolLink" type="button">复制链接</button>
+              <a id="playOwnedSchool" class="primary-link" href="index.html">进入我的学校</a>
+            </div>
+          </section>
+        </div>
+
+        <aside class="preview-column" aria-label="学校实时预览">
+          <div class="preview-heading">
+            <span>LIVE PREVIEW</span>
+            <i aria-hidden="true"></i>
+          </div>
+          <div id="creatorSkinPreview" class="campus-preview">
+            <canvas id="creatorCampusPreview" width="720" height="460" aria-hidden="true"></canvas>
+            <div class="preview-caption">
+              <strong id="creatorPreviewName">Schooltopia</strong>
+              <span id="creatorPreviewTagline">你的学校皮肤预览</span>
+            </div>
+          </div>
+          <div class="preview-swatches" aria-label="当前学校配色">
+            <span id="previewPrimary"></span>
+            <span id="previewAccent"></span>
+            <span id="previewDanger"></span>
+            <span id="previewSky"></span>
+          </div>
+          <dl class="preview-facts">
+            <div><dt>事件</dt><dd id="previewEventCount">0</dd></div>
+            <div><dt>规则</dt><dd>5</dd></div>
+            <div><dt>周期</dt><dd>12 周</dd></div>
+          </dl>
+        </aside>
+      </div>
+      </div>
+    </main>
+
+    <dialog id="nodeEditorDialog" class="node-editor-dialog" aria-labelledby="nodeEditorTitle">
+      <form id="nodeEditorForm">
+        <header class="node-editor-head">
+          <div>
+            <p class="section-kicker">Node Workshop</p>
+            <h2 id="nodeEditorTitle">自定义剧情节点</h2>
+            <p id="nodeEditorEventName"></p>
+          </div>
+          <button id="closeNodeEditor" class="dialog-close-button" type="button" aria-label="关闭节点编辑器" title="关闭">×</button>
+        </header>
+
+        <label class="event-description-field" for="nodeEditorDescription">
+          事件开场描述
+          <textarea id="nodeEditorDescription" rows="3" maxlength="360"></textarea>
+        </label>
+
+        <div id="nodeEditorList" class="node-editor-list"></div>
+
+        <p class="node-editor-note">教师路线会自动把智慧、体能、心情、同学好感和班主任信任映射为对应的教师属性。</p>
+        <div class="dialog-actions node-editor-actions">
+          <button id="cancelNodeEditor" type="button">取消</button>
+          <button id="saveNodeEditor" class="primary-button" type="submit">保存三个节点</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="i18n.js"></script>
+    <script src="creator-3d-loader.js"></script>
+    <script src="creator-audio.js"></script>
+    <script src="creator.js"></script>
+  </body>
+</html>

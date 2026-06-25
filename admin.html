@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#10242b" />
+    <title>Schooltopia · 研究后台</title>
+    <link rel="stylesheet" href="admin.css" />
+  </head>
+  <body>
+    <header class="admin-topbar">
+      <div class="brand-block">
+        <span class="brand-mark" aria-hidden="true">SE</span>
+        <div>
+          <strong>Schooltopia</strong>
+          <small>校园模拟与玩家研究后台</small>
+        </div>
+      </div>
+      <a class="back-link" href="index.html">返回游戏</a>
+    </header>
+
+    <main class="admin-shell">
+      <section class="workspace-head">
+        <div>
+          <p class="eyebrow">当前研究空间</p>
+          <h1 id="workspaceTitle">示例学校</h1>
+          <p id="workspaceMeta">规则版本 v1 · 正在加载数据</p>
+        </div>
+        <div class="workspace-controls">
+          <label for="adminSchoolSelect">学校</label>
+          <select id="adminSchoolSelect"></select>
+          <button id="openNewSchool" type="button">新建学校</button>
+        </div>
+      </section>
+
+      <nav class="admin-tabs" aria-label="后台功能">
+        <button class="active" type="button" data-tab="config">学校配置</button>
+        <button type="button" data-tab="events">事件表格</button>
+        <button type="button" data-tab="report">研究报告</button>
+      </nav>
+
+      <p id="adminStatus" class="status-line" aria-live="polite"></p>
+
+      <section id="tab-config" class="tab-panel active">
+        <div class="section-head">
+          <div>
+            <h2>学校版本与规则权重</h2>
+            <p>换皮肤、调节校园机制，不改动核心游戏代码。</p>
+          </div>
+          <button id="saveConfig" class="primary-button" type="button">保存设置</button>
+        </div>
+
+        <div class="config-layout">
+          <section class="tool-panel">
+            <h3>基本信息</h3>
+            <label>
+              学校名称
+              <input id="schoolNameInput" maxlength="60" />
+            </label>
+            <label>
+              版本说明
+              <textarea id="schoolTaglineInput" rows="3" maxlength="140"></textarea>
+            </label>
+            <label class="switch-row">
+              <span>
+                <strong>根据反馈自动迭代</strong>
+                <small>每累计 5 局最多微调 0.05，并保留记录</small>
+              </span>
+              <input id="autoIterationInput" type="checkbox" />
+            </label>
+          </section>
+
+          <section class="tool-panel">
+            <h3>学校皮肤</h3>
+            <div class="color-grid">
+              <label>主色 <input id="skinPrimary" type="color" /></label>
+              <label>强调色 <input id="skinAccent" type="color" /></label>
+              <label>风险色 <input id="skinDanger" type="color" /></label>
+              <label>天空色 <input id="skinSky" type="color" /></label>
+            </div>
+            <div id="skinPreview" class="skin-preview">
+              <strong>Schooltopia</strong>
+              <span>当前学校皮肤预览</span>
+            </div>
+          </section>
+        </div>
+
+        <section class="weight-section">
+          <div class="section-head compact">
+            <div>
+              <h3>变量权重</h3>
+              <p>0.6 至 1.4；1.0 为原始强度。</p>
+            </div>
+            <div class="inline-actions">
+              <button id="runIteration" type="button">运行一次数据迭代</button>
+              <button id="resetWeights" class="danger-button" type="button">恢复默认权重</button>
+            </div>
+          </div>
+          <div id="weightRows" class="weight-rows"></div>
+        </section>
+      </section>
+
+      <section id="tab-events" class="tab-panel">
+        <div class="section-head">
+          <div>
+            <h2>校本事件与剧情节点</h2>
+            <p>输入真实校园事件，系统会生成三个可玩的选择节点和对应属性变化。</p>
+          </div>
+        </div>
+
+        <section class="generator-band">
+          <label for="eventPrompt">学校里发生了什么</label>
+          <textarea id="eventPrompt" rows="4" maxlength="320" placeholder="例如：期中考试和社团汇演撞在同一周，学生既要排练又要复习。"></textarea>
+          <div class="generator-controls">
+            <label>
+              适用路线
+              <select id="eventRoute">
+                <option value="student">学生路线</option>
+                <option value="teacher">教师路线</option>
+                <option value="both">学生与教师</option>
+              </select>
+            </label>
+            <button id="generateEvent" class="primary-button" type="button">生成剧情节点</button>
+          </div>
+        </section>
+
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>事件名称</th>
+                <th>路线</th>
+                <th>触发率</th>
+                <th>生成节点</th>
+                <th>启用</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody id="eventTableBody"></tbody>
+          </table>
+        </div>
+        <p id="eventEmpty" class="empty-state">还没有校本事件。先输入一条真实校园经历。</p>
+      </section>
+
+      <section id="tab-report" class="tab-panel">
+        <div class="section-head">
+          <div>
+            <h2>Player Research Report</h2>
+            <p>每局结束后自动更新属性取舍、智慧追求、藤校提示影响、身份策略和现实相似度。</p>
+          </div>
+          <div class="inline-actions">
+            <button id="refreshReport" type="button">刷新报告</button>
+            <button id="exportReport" type="button">导出 CSV</button>
+          </div>
+        </div>
+
+        <div id="metricGrid" class="metric-grid"></div>
+
+        <section class="insight-section">
+          <h3>自动文字总结</h3>
+          <div id="insightList" class="insight-list"></div>
+        </section>
+
+        <section class="data-section">
+          <div class="section-head compact-section-head">
+            <div>
+              <h3>每轮报告记录</h3>
+              <p>每完成一局自动生成；提交反馈后会补充到同一轮。</p>
+            </div>
+          </div>
+          <div id="roundReportList" class="round-report-list"></div>
+        </section>
+
+        <div class="report-grid">
+          <section class="data-section">
+            <h3>玩家选择统计</h3>
+            <div id="choiceBars" class="bar-list"></div>
+          </section>
+          <section class="data-section">
+            <h3>结局分布</h3>
+            <div id="endingBars" class="bar-list"></div>
+          </section>
+        </div>
+
+        <section class="data-section">
+          <h3>不同类型玩家比较</h3>
+          <div class="comparison-grid">
+            <div>
+              <h4>走读生与住宿生</h4>
+              <div id="identityBreakdown"></div>
+            </div>
+            <div>
+              <h4>高年级与低年级</h4>
+              <div id="gradeBreakdown"></div>
+            </div>
+            <div>
+              <h4>学术型与社交型</h4>
+              <div id="styleBreakdown"></div>
+            </div>
+          </div>
+        </section>
+
+        <div class="report-grid">
+          <section class="data-section">
+            <h3>玩家反馈</h3>
+            <div id="feedbackTable"></div>
+          </section>
+          <section class="data-section">
+            <h3>自动迭代记录</h3>
+            <div id="iterationList"></div>
+          </section>
+        </div>
+
+        <section class="research-report-section">
+          <p class="eyebrow">可直接用于展示</p>
+          <h3>Player Research Report 摘要</h3>
+          <dl id="researchReport"></dl>
+        </section>
+      </section>
+    </main>
+
+    <dialog id="newSchoolDialog">
+      <form method="dialog">
+        <h2>新建学校版本</h2>
+        <label>
+          学校名称
+          <input id="newSchoolName" maxlength="60" placeholder="例如：南山实验学校" />
+        </label>
+        <div class="dialog-actions">
+          <button value="cancel">取消</button>
+          <button id="createSchool" class="primary-button" value="default">创建</button>
+        </div>
+      </form>
+    </dialog>
+
+    <script src="admin.js"></script>
+  </body>
+</html>

@@ -1,0 +1,306 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Schooltopia 是一款可由不同学校配置事件、皮肤和变量权重的 12 周校园生存模拟游戏。"
+    />
+    <meta name="theme-color" content="#17201d" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Schooltopia 校园生存模拟器" />
+    <meta
+      property="og:description"
+      content="把真实校园事件生成剧情节点，通过匿名试玩数据理解学生压力与校园体验。"
+    />
+    <meta property="og:image" content="share-cover.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Schooltopia 校园生存模拟器" />
+    <meta
+      name="twitter:description"
+      content="同一套校园生存引擎，不同学校拥有自己的事件、皮肤和规则。"
+    />
+    <meta name="twitter:image" content="share-cover.png" />
+    <title>Schooltopia</title>
+    <link
+      rel="icon"
+      href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2317201d'/%3E%3Cpath d='M10 43h44v7H10z' fill='%23f0c55f'/%3E%3Cpath d='M15 24h34v20H15z' fill='%23247a86'/%3E%3Cpath d='M12 20h40v6H12z' fill='%23b34536'/%3E%3Cpath d='M22 31h6v8h-6zm14 0h6v8h-6z' fill='%23fff7e6'/%3E%3C/svg%3E"
+    />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="top-band">
+        <canvas id="campusCanvas" width="1200" height="320" aria-hidden="true"></canvas>
+        <div class="top-links">
+          <a class="creator-link" href="creator.html">
+            <span class="school-create-mark" aria-hidden="true"></span>
+            <span>创建学校</span>
+          </a>
+          <button id="languageToggle" class="language-toggle" type="button" data-lang-toggle>English</button>
+        </div>
+        <div class="audio-controls" aria-label="声音设置">
+          <button id="musicToggle" class="sound-toggle" type="button" aria-pressed="true" title="背景音乐：Gymnopédie No.1">
+            <span class="music-mark" aria-hidden="true"></span>
+            <span id="musicLabel">音乐 开</span>
+          </button>
+          <button id="soundToggle" class="sound-toggle" type="button" aria-pressed="true">
+            <span class="sound-mark" aria-hidden="true"></span>
+            <span id="soundLabel">音效 开</span>
+          </button>
+        </div>
+        <div class="title-block">
+          <p class="kicker">可配置校园生存模拟引擎</p>
+          <h1>Schooltopia</h1>
+          <div class="school-line">
+            <strong id="schoolNameDisplay">示例学校</strong>
+            <span id="schoolVersion">规则版本 v1</span>
+          </div>
+          <p id="schoolTagline">每所学校都有自己的生存规则。</p>
+          <p id="systemLine">欢迎进入 Schooltopia。校园规则正在加载。</p>
+        </div>
+      </section>
+
+      <section id="setupView" class="setup-grid">
+        <div class="panel">
+          <div class="panel-head">
+            <span>身份系统</span>
+            <small>开局选择</small>
+          </div>
+          <div class="route-row" id="routeButtons"></div>
+          <div class="identity-row" id="identityButtons"></div>
+          <div class="setup-subhead">
+            <span>难度选择</span>
+            <small id="difficultyLabel">标准模式</small>
+          </div>
+          <div class="difficulty-row" id="difficultyButtons"></div>
+          <button id="openCodexSetup" class="secondary-action compact-action" type="button">收集图鉴</button>
+        </div>
+
+        <div class="panel">
+          <div class="panel-head">
+            <span>属性系统</span>
+            <small id="pointsLeft">剩余 10 点</small>
+          </div>
+          <div id="attributeSetup" class="attribute-setup"></div>
+          <p class="setup-hint">用 + / - 调整属性点，单项最低为 3。把剩余属性点全部分配完后，开始游戏按钮就会亮起。</p>
+          <button id="startGame" class="primary-action" type="button">开始游戏</button>
+        </div>
+
+        <div class="panel save-panel">
+          <div class="panel-head">
+            <span>存档选择</span>
+            <small>本地 3 个槽位</small>
+          </div>
+          <div id="saveSlotList" class="save-slot-list"></div>
+        </div>
+
+        <div class="panel research-profile-panel">
+          <div class="panel-head">
+            <span>试玩研究档案</span>
+            <small id="researchConnection">正在连接匿名研究</small>
+          </div>
+          <label class="field-label" for="schoolSelect">学校版本</label>
+          <select id="schoolSelect" class="engine-select">
+            <option value="demo-school">示例学校</option>
+          </select>
+          <div class="setup-subhead">
+            <span>年级段</span>
+            <small>用于比较不同压力路径</small>
+          </div>
+          <div id="gradeBandButtons" class="profile-choice-row">
+            <button type="button" data-value="lower">低年级</button>
+            <button type="button" data-value="upper">高年级</button>
+          </div>
+          <div class="setup-subhead">
+            <span>玩家倾向</span>
+            <small>用于比较生存策略</small>
+          </div>
+          <div id="playerStyleButtons" class="profile-choice-row three-columns">
+            <button type="button" data-value="academic">学术型</button>
+            <button type="button" data-value="social">社交型</button>
+            <button type="button" data-value="balanced">平衡型</button>
+          </div>
+          <p class="privacy-note">仅记录匿名设备编号、路线、选项、属性变化、结局与主动反馈，不收集姓名或联系方式。</p>
+        </div>
+      </section>
+
+      <section id="gameView" class="game-grid hidden">
+        <section class="game-hud">
+          <div>
+            <span id="routeBadge">学生路线</span>
+            <strong id="hudTitle">第 1 周 · 日常行动</strong>
+          </div>
+          <div id="hudStats" class="hud-stats"></div>
+          <button id="openCodexGame" class="secondary-action compact-action" type="button">收集图鉴</button>
+        </section>
+
+        <aside class="panel stats-panel">
+          <div class="panel-head">
+            <span id="weekLabel">第 1 周</span>
+            <small id="phaseLabel">日常行动</small>
+          </div>
+          <div id="roleScene" class="role-scene"></div>
+          <div id="statsList" class="stats-list"></div>
+          <div id="changeFeedWrap" class="change-feed-wrap">
+            <strong>本次变化</strong>
+            <div id="changeFeed" class="change-feed"></div>
+          </div>
+          <div id="aiHabitPanel" class="ai-habit-panel hidden"></div>
+          <div class="ledger">
+            <div>
+              <strong>状态</strong>
+              <p id="statusList">无</p>
+            </div>
+            <div>
+              <strong>称号</strong>
+              <p id="titleList">无</p>
+            </div>
+            <div>
+              <strong>成就</strong>
+              <p id="achievementList">无</p>
+            </div>
+            <div>
+              <strong>道具</strong>
+              <p id="itemList">无</p>
+            </div>
+          </div>
+          <div class="save-box">
+            <div class="save-box-head">
+              <strong>存档</strong>
+              <small id="saveHint">日常或午饭选择时可保存</small>
+            </div>
+            <div id="saveInGameSlots" class="save-button-row"></div>
+          </div>
+          <button id="openCodexStats" class="secondary-action compact-action" type="button">收集图鉴</button>
+          <button id="restartInGame" class="secondary-action" type="button">重新开始</button>
+        </aside>
+
+        <section class="panel action-panel">
+          <div class="panel-head">
+            <span id="actionTitle">日常行动选择</span>
+            <small id="actionSubtitle">每周选择一次</small>
+          </div>
+          <div id="actionList" class="action-list"></div>
+        </section>
+
+        <section class="panel log-panel">
+          <div class="panel-head">
+            <span>系统记录</span>
+            <small id="roundState">等待行动</small>
+          </div>
+          <div id="logList" class="log-list"></div>
+        </section>
+      </section>
+
+      <section id="endingView" class="ending-view hidden">
+        <div class="ending-panel">
+          <p class="kicker">最终结局</p>
+          <h2 id="endingTitle"></h2>
+          <div id="endingText"></div>
+          <div class="session-insight-box">
+            <strong>本局研究摘要</strong>
+            <p id="sessionInsight">完成一局后，这里会生成匿名研究摘要。</p>
+          </div>
+          <section id="feedbackPanel" class="feedback-panel hidden">
+            <div class="feedback-head">
+              <strong>校园体验反馈</strong>
+              <small>用于生成下一版研究洞察</small>
+            </div>
+            <div class="feedback-grid">
+              <label>
+                最希望优化
+                <select id="feedbackTopic" class="engine-select">
+                  <option value="schedule">作息与时间安排</option>
+                  <option value="assessment">作业和评价方式</option>
+                  <option value="wellbeing">心理与身体恢复</option>
+                  <option value="trust">师生信任和沟通</option>
+                  <option value="food">食堂与校园设施</option>
+                  <option value="social">同学关系与归属感</option>
+                  <option value="technology">网络、设备与 AI 使用</option>
+                </select>
+              </label>
+              <label>
+                本局体验
+                <select id="feedbackRating" class="engine-select">
+                  <option value="5">5 · 很贴近</option>
+                  <option value="4">4 · 比较贴近</option>
+                  <option value="3">3 · 一般</option>
+                  <option value="2">2 · 不太贴近</option>
+                  <option value="1">1 · 完全不贴近</option>
+                </select>
+              </label>
+              <label>
+                最优选择像真实选择吗
+                <select id="feedbackOptimalSimilarity" class="engine-select">
+                  <option value="5">5 · 非常相似</option>
+                  <option value="4">4 · 比较相似</option>
+                  <option value="3">3 · 有时相似</option>
+                  <option value="2">2 · 不太相似</option>
+                  <option value="1">1 · 完全不同</option>
+                </select>
+              </label>
+            </div>
+            <label class="feedback-text-label" for="feedbackText">还想告诉学校什么</label>
+            <textarea id="feedbackText" rows="3" maxlength="500" placeholder="例如：最难受的是作业集中在同一周，恢复行动又太少。"></textarea>
+            <button id="submitFeedback" class="secondary-action" type="button">提交匿名反馈</button>
+            <p id="feedbackStatus" class="feedback-status" aria-live="polite"></p>
+          </section>
+          <button id="restartGame" class="primary-action" type="button">重新开始</button>
+          <button id="openCodexEnding" class="secondary-action compact-action" type="button">查看图鉴</button>
+        </div>
+      </section>
+
+      <section id="codexView" class="codex-view hidden">
+        <div class="codex-panel">
+          <div class="codex-head">
+            <div>
+              <p class="kicker">收集进度</p>
+              <h2>图鉴</h2>
+            </div>
+            <button id="closeCodex" class="secondary-action compact-action" type="button">返回</button>
+          </div>
+          <div class="codex-tabs" role="tablist" aria-label="图鉴分类">
+            <button class="codex-tab active" type="button" data-codex-tab="events">事件</button>
+            <button class="codex-tab" type="button" data-codex-tab="endings">结局</button>
+            <button class="codex-tab" type="button" data-codex-tab="achievements">成就</button>
+          </div>
+          <div class="codex-tools" aria-label="图鉴重置">
+            <button id="resetCodexEvents" class="secondary-action compact-action danger-action" type="button">重置事件</button>
+            <button id="resetCodexEndings" class="secondary-action compact-action danger-action" type="button">重置结局</button>
+            <button id="resetCodexAchievements" class="secondary-action compact-action danger-action" type="button">重置成就</button>
+            <button id="resetCodexAll" class="secondary-action compact-action danger-action" type="button">重置全部</button>
+          </div>
+          <div id="codexSummary" class="codex-summary"></div>
+          <div id="codexGrid" class="codex-grid"></div>
+        </div>
+      </section>
+    </main>
+
+    <div
+      id="eventModal"
+      class="modal hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="eventTitle"
+      aria-describedby="eventDescription"
+    >
+      <div class="modal-panel" tabindex="-1">
+        <div class="panel-head">
+          <span id="eventTitle"></span>
+          <small id="eventType"></small>
+        </div>
+        <p id="eventDescription"></p>
+        <div id="eventOptions" class="event-options"></div>
+      </div>
+    </div>
+
+    <script src="i18n.js"></script>
+    <script src="schooltopia.js"></script>
+    <script src="game.js"></script>
+  </body>
+</html>
