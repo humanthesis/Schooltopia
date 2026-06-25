@@ -31,6 +31,8 @@
     "匿名研究已连接": "Anonymous research connected",
     "离线试玩，不上传数据": "Offline play, no data upload",
     "后台未启动，当前为离线试玩": "Backend is offline. Playing locally.",
+    "GitHub 离线试玩，不上传数据": "GitHub offline play. Data is not uploaded.",
+    "GitHub 离线示例学校": "GitHub Offline Demo School",
     "研究记录暂时无法上传": "Research records cannot upload right now.",
     "部分研究记录未上传": "Some research records were not uploaded.",
     "学校版本": "School Version",
@@ -366,9 +368,13 @@
 
   function updateToggles() {
     document.querySelectorAll("[data-lang-toggle]").forEach((button) => {
-      button.textContent = current === "en" ? "中文" : "English";
-      button.setAttribute("aria-label", current === "en" ? "切换到中文" : "Switch to English");
-      button.title = current === "en" ? "切换到中文" : "Switch to English";
+      const label = current === "en" ? "中文" : "English";
+      const accessibleLabel = current === "en" ? "切换到中文" : "Switch to English";
+      if (button.textContent !== label) button.textContent = label;
+      if (button.getAttribute("aria-label") !== accessibleLabel) {
+        button.setAttribute("aria-label", accessibleLabel);
+      }
+      if (button.title !== accessibleLabel) button.title = accessibleLabel;
     });
   }
 

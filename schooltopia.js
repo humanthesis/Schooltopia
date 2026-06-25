@@ -1,5 +1,6 @@
 (function () {
   const API = "/api";
+  const STATIC_HOST = window.location.hostname.endsWith(".github.io");
   const PROFILE_KEY = "schooltopia_research_profile";
   const CLIENT_KEY = "schooltopia_anonymous_client";
   const state = {
@@ -120,6 +121,13 @@
     bindProfileButtons("gradeBandButtons", "gradeBand");
     bindProfileButtons("playerStyleButtons", "playerStyle");
     const select = document.getElementById("schoolSelect");
+    if (STATIC_HOST) {
+      state.online = false;
+      if (select) select.innerHTML = '<option value="demo-school">GitHub 离线示例学校</option>';
+      setConnectionStatus(false, "GitHub 离线试玩，不上传数据");
+      bindFeedbackForm();
+      return;
+    }
     try {
       state.schools = await api("/schools");
       if (select) {
