@@ -193,12 +193,7 @@
   }
 
   async function createSchool() {
-    const name = $("creatorSchoolName").value.trim();
-    if (!name) {
-      setStatus("请先填写学校名称。", true);
-      $("creatorSchoolName").focus();
-      return;
-    }
+    const name = $("creatorSchoolName").value.trim() || localizedText("未命名学校");
     const button = $("createOwnedSchool");
     button.disabled = true;
     try {

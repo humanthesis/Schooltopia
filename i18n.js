@@ -46,6 +46,7 @@
     "后台未启动，当前为离线试玩": "Backend is offline. Playing locally.",
     "GitHub 离线试玩，不上传数据": "GitHub offline play. Data is not uploaded.",
     "GitHub 离线示例学校": "GitHub Offline Demo School",
+    "离线示例学校": "Offline Demo School",
     "研究记录暂时无法上传": "Research records cannot upload right now.",
     "部分研究记录未上传": "Some research records were not uploaded.",
     "学校版本": "School Version",

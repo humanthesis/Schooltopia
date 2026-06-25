@@ -37,6 +37,20 @@
     }
   }
 
+  function localizedText(value) {
+    return window.SchooltopiaI18n?.phrase?.(String(value ?? "")) ?? String(value ?? "");
+  }
+
+  function renderSchoolOption(select, id, name) {
+    if (!select) return;
+    select.innerHTML = "";
+    const option = document.createElement("option");
+    option.value = id;
+    option.textContent = localizedText(name);
+    select.append(option);
+    select.value = id;
+  }
+
   function readStaticConfig() {
     const fallback = {
       id: "local-school",
@@ -142,8 +156,8 @@
     const name = document.getElementById("schoolNameDisplay");
     const tagline = document.getElementById("schoolTagline");
     const version = document.getElementById("schoolVersion");
-    if (name) name.textContent = config.name;
-    if (tagline) tagline.textContent = config.tagline;
+    if (name) name.textContent = localizedText(config.name);
+    if (tagline) tagline.textContent = localizedText(config.tagline);
     if (version) version.textContent = `规则版本 v${config.version}`;
     document.body.dataset.school = config.id;
   }
@@ -164,18 +178,21 @@
       state.online = false;
       const config = readStaticConfig();
       applyConfig(config);
-      if (select) {
-        select.innerHTML = `<option value="${config.id}">${config.name}</option>`;
-        select.value = config.id;
-      }
+      renderSchoolOption(select, config.id, config.name);
       setConnectionStatus(false, "GitHub 离线试玩，不上传数据");
       bindFeedbackForm();
+      window.addEventListener("schooltopia-language-change", () => {
+        applyConfig(config);
+        renderSchoolOption(select, config.id, config.name);
+      });
       return;
     }
     try {
       state.schools = await api("/schools");
       if (select) {
-        select.innerHTML = state.schools.map((school) => `<option value="${school.id}">${school.name}</option>`).join("");
+        select.innerHTML = state.schools
+          .map((school) => `<option value="${school.id}">${localizedText(school.name)}</option>`)
+          .join("");
         if (!state.schools.some((school) => school.id === state.profile.schoolId)) {
           state.profile.schoolId = state.schools[0]?.id || "demo-school";
         }
@@ -190,7 +207,7 @@
       setConnectionStatus(true);
     } catch (error) {
       setConnectionStatus(false, "后台未启动，当前为离线试玩");
-      if (select) select.innerHTML = '<option value="demo-school">离线示例学校</option>';
+      renderSchoolOption(select, "demo-school", "离线示例学校");
     }
     bindFeedbackForm();
   }
