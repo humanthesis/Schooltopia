@@ -5,6 +5,7 @@
 }
 
 body {
+  overflow-x: clip;
   background:
     linear-gradient(180deg, #edf1ee 0 300px, var(--page) 620px),
     repeating-linear-gradient(90deg, rgba(20, 37, 34, 0.035) 0 1px, transparent 1px 92px);
@@ -20,6 +21,7 @@ body {
   display: flex;
   align-items: center;
   gap: 7px;
+  min-width: 0;
 }
 
 .creator-audio-button {
@@ -525,7 +527,7 @@ body {
 
 .dock-controls {
   display: grid;
-  grid-template-columns: minmax(210px, 1fr) auto minmax(300px, 1fr);
+  grid-template-columns: minmax(180px, 1fr) auto minmax(220px, 0.9fr);
   gap: 10px;
   align-items: end;
 }
@@ -544,9 +546,13 @@ body {
 
 .owned-school-wrap {
   display: grid;
-  grid-template-columns: auto auto minmax(150px, 1fr) auto;
+  grid-template-columns: auto minmax(90px, 1fr) auto;
   gap: 8px;
   align-items: end;
+}
+
+.owned-school-wrap .dock-or {
+  display: none;
 }
 
 .dock-or {
@@ -688,6 +694,7 @@ body {
 }
 
 .skin-preset {
+  min-width: 0;
   display: grid;
   gap: 10px;
   min-height: 86px;
@@ -704,6 +711,7 @@ body {
 
 .skin-preset strong {
   font-size: 0.82rem;
+  overflow-wrap: anywhere;
 }
 
 .preset-swatches {
@@ -1211,6 +1219,12 @@ body {
     justify-content: center;
   }
 
+  .creator-audio-button.language-toggle {
+    width: auto;
+    min-width: 62px;
+    padding: 0 8px;
+  }
+
   .creator-audio-button > span:last-child {
     position: absolute;
     width: 1px;
@@ -1221,9 +1235,20 @@ body {
   }
 
   .creator-topbar .back-link {
+    width: 42px;
     min-height: 42px;
-    padding: 0 11px;
+    padding: 0;
+    justify-content: center;
     font-size: 0.78rem;
+  }
+
+  .creator-topbar .back-link > span:last-child {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
 
   .creator-shell {

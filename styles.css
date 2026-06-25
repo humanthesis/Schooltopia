@@ -608,7 +608,10 @@ h1 {
 }
 
 .choice-button {
+  min-width: 0;
+  height: 100%;
   padding: 13px 14px;
+  overflow-wrap: anywhere;
   text-align: left;
   font-weight: 900;
   box-shadow: var(--shadow-soft);
@@ -705,7 +708,10 @@ h1 {
 }
 
 .save-slot-card {
+  min-width: 0;
   min-height: 126px;
+  display: flex;
+  flex-direction: column;
   padding: 12px;
   border: 1px solid rgba(198, 209, 203, 0.9);
   border-radius: 8px;
@@ -738,6 +744,7 @@ h1 {
   font-size: 0.86rem;
   font-weight: 850;
   line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .save-slot-card small {
@@ -753,6 +760,11 @@ h1 {
   flex-wrap: wrap;
   gap: 8px;
   margin-top: 12px;
+}
+
+.save-slot-actions {
+  margin-top: auto;
+  padding-top: 12px;
 }
 
 .save-slot-actions .secondary-action,
@@ -1831,7 +1843,7 @@ h1 {
   }
 
   .title-block {
-    padding-top: 70px;
+    padding-top: 112px;
     padding-bottom: 62px;
   }
 
@@ -1902,7 +1914,7 @@ h1 {
   }
 
   .action-card {
-    grid-template-columns: 1fr;
+    grid-template-columns: auto minmax(0, 1fr);
   }
 
   .action-key {

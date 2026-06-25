@@ -1,6 +1,30 @@
 (function () {
   const API = "/api";
   const OWNED_KEY = "schooltopia_owned_schools_v2";
+  const STATIC_SCHOOL_KEY = "schooltopia_static_school_v1";
+  const STATIC_HOST =
+    window.location.hostname.endsWith(".github.io") ||
+    new URLSearchParams(window.location.search).has("static");
+  const DEFAULT_STATIC_SCHOOL = {
+    id: "local-school",
+    name: "未命名学校",
+    tagline: "每所学校都有自己的生存规则。",
+    skin: {
+      primary: "#245f61",
+      accent: "#d09a39",
+      danger: "#b64d3f",
+      sky: "#10242b",
+    },
+    weights: {
+      eventFrequency: 1,
+      academicPressure: 1,
+      socialSupport: 1,
+      recovery: 1,
+      trustSensitivity: 1,
+    },
+    version: 1,
+    customEvents: [],
+  };
   const weightMeta = [
     ["eventFrequency", "事件密度", "随机事件出现频率"],
     ["academicPressure", "学术压力", "学习与考试造成的损耗"],
@@ -59,6 +83,40 @@
     }
   }
 
+  function clone(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  function readStaticSchool() {
+    try {
+      const stored = JSON.parse(localStorage.getItem(STATIC_SCHOOL_KEY) || "null");
+      if (!stored) return clone(DEFAULT_STATIC_SCHOOL);
+      return {
+        ...clone(DEFAULT_STATIC_SCHOOL),
+        ...stored,
+        skin: { ...DEFAULT_STATIC_SCHOOL.skin, ...(stored.skin || {}) },
+        weights: { ...DEFAULT_STATIC_SCHOOL.weights, ...(stored.weights || {}) },
+        customEvents: Array.isArray(stored.customEvents) ? stored.customEvents : [],
+      };
+    } catch {
+      return clone(DEFAULT_STATIC_SCHOOL);
+    }
+  }
+
+  function saveStaticSchool(school) {
+    state.school = school;
+    try {
+      localStorage.setItem(STATIC_SCHOOL_KEY, JSON.stringify(school));
+    } catch {
+      setStatus("浏览器无法保存学校设置，请保持本页面打开。", true);
+    }
+    return school;
+  }
+
+  function staticOwnedEntry(school) {
+    return { id: school.id, name: school.name, token: "local" };
+  }
+
   async function api(path, options = {}) {
     const response = await fetch(`${API}${path}`, {
       ...options,
@@ -102,6 +160,22 @@
     const button = $("createOwnedSchool");
     button.disabled = true;
     try {
+      if (STATIC_HOST) {
+        const school = saveStaticSchool({
+          ...clone(DEFAULT_STATIC_SCHOOL),
+          name,
+          updatedAt: new Date().toISOString(),
+        });
+        state.owned = [staticOwnedEntry(school)];
+        renderOwned();
+        $("ownedSchoolSelect").value = school.id;
+        state.token = "local";
+        renderWorkspace();
+        $("creatorWorkspace").classList.remove("hidden");
+        $("creatorSchoolName").value = "";
+        setStatus(`已创建“${school.name}”。现在可以选择皮肤并添加校园事件。`);
+        return;
+      }
       state.token = "";
       const school = await api("/schools", {
         method: "POST",
@@ -133,6 +207,15 @@
   }
 
   async function loadSchool(id) {
+    if (STATIC_HOST) {
+      state.school = readStaticSchool();
+      state.owned = [staticOwnedEntry(state.school)];
+      renderOwned();
+      $("ownedSchoolSelect").value = state.school.id;
+      renderWorkspace();
+      $("creatorWorkspace").classList.remove("hidden");
+      return;
+    }
     try {
       state.school = await api(`/config?school=${encodeURIComponent(id)}`);
       renderWorkspace();
@@ -322,6 +405,20 @@
 
   async function saveConfig() {
     try {
+      if (STATIC_HOST) {
+        const school = saveStaticSchool({
+          ...state.school,
+          ...configPayload(),
+          version: Number(state.school.version || 1) + 1,
+          updatedAt: new Date().toISOString(),
+        });
+        state.owned = [staticOwnedEntry(school)];
+        renderOwned();
+        $("ownedSchoolSelect").value = school.id;
+        renderWorkspace();
+        setStatus("学校外观和规则权重已保存，专属游戏会立即使用新设置。");
+        return;
+      }
       state.school = await api(`/schools/${state.school.id}`, {
         method: "PUT",
         body: JSON.stringify(configPayload()),
@@ -345,6 +442,19 @@
     const button = $("resetOwnedSchool");
     button.disabled = true;
     try {
+      if (STATIC_HOST) {
+        const school = saveStaticSchool({
+          ...clone(DEFAULT_STATIC_SCHOOL),
+          version: Number(state.school.version || 1) + 1,
+          updatedAt: new Date().toISOString(),
+        });
+        state.owned = [staticOwnedEntry(school)];
+        renderOwned();
+        $("ownedSchoolSelect").value = school.id;
+        renderWorkspace();
+        setStatus("学校已重置：名称恢复为“未命名学校”，编辑权限保留，其余设置已恢复初始状态。");
+        return;
+      }
       state.school = await api(`/schools/${state.school.id}/reset`, { method: "POST" });
       const owned = state.owned.find((item) => item.id === state.school.id);
       if (owned) owned.name = state.school.name;
@@ -376,6 +486,47 @@
     const button = $("creatorGenerateEvent");
     button.disabled = true;
     try {
+      if (STATIC_HOST) {
+        const title = prompt.replace(/[。！？!?\n].*$/, "").slice(0, 18) || "校园新事件";
+        const event = {
+          id: `school_event_${Date.now().toString(36)}`,
+          title,
+          category: "campus",
+          route: $("creatorEventRoute").value,
+          description: prompt,
+          chance: 22,
+          enabled: true,
+          generated: true,
+          options: [
+            {
+              id: "face_it",
+              label: "正面处理",
+              detail: "直接解决问题，收益更明显，也可能付出代价。",
+              effects: [{ stat: "wisdom", delta: 2 }, { stat: "mood", delta: -1 }],
+            },
+            {
+              id: "seek_support",
+              label: "找人合作",
+              detail: "借助关系网络缓冲压力。",
+              effects: [{ stat: "peerFavor", delta: 2 }, { stat: "homeroomTrust", delta: 1 }],
+            },
+            {
+              id: "protect_self",
+              label: "先保护状态",
+              detail: "减少眼前损耗，但问题不会完全消失。",
+              effects: [{ stat: "stamina", delta: 2 }, { stat: "mood", delta: 1 }],
+            },
+          ],
+          createdAt: new Date().toISOString(),
+        };
+        state.school.customEvents.push(event);
+        state.school.version = Number(state.school.version || 1) + 1;
+        saveStaticSchool(state.school);
+        $("creatorEventPrompt").value = "";
+        renderWorkspace();
+        setStatus(`已把“${event.title}”生成三个可玩的剧情节点。`);
+        return;
+      }
       const event = await api(`/schools/${state.school.id}/events/generate`, {
         method: "POST",
         body: JSON.stringify({ prompt, route: $("creatorEventRoute").value }),
@@ -519,6 +670,20 @@
     const button = $("saveNodeEditor");
     button.disabled = true;
     try {
+      if (STATIC_HOST) {
+        const item = state.school.customEvents.find((entry) => entry.id === state.editingEventId);
+        if (item) {
+          item.description = $("nodeEditorDescription").value;
+          item.options = options;
+          item.updatedAt = new Date().toISOString();
+          state.school.version = Number(state.school.version || 1) + 1;
+          saveStaticSchool(state.school);
+        }
+        closeNodeEditor();
+        renderWorkspace();
+        setStatus("剧情节点已更新，新的选项与属性变化会直接进入游戏。");
+        return;
+      }
       await api(`/schools/${state.school.id}/events/${state.editingEventId}`, {
         method: "PUT",
         body: JSON.stringify({
@@ -538,6 +703,21 @@
 
   async function saveEvent(row, eventId) {
     try {
+      if (STATIC_HOST) {
+        const item = state.school.customEvents.find((event) => event.id === eventId);
+        if (item) {
+          item.title = row.querySelector(".event-title-input").value;
+          item.route = row.querySelector(".route-select").value;
+          item.chance = Number(row.querySelector(".chance-input").value);
+          item.enabled = row.querySelector(".enabled-input").checked;
+          item.updatedAt = new Date().toISOString();
+          state.school.version = Number(state.school.version || 1) + 1;
+          saveStaticSchool(state.school);
+        }
+        renderWorkspace();
+        setStatus("事件设置已保存。");
+        return;
+      }
       await api(`/schools/${state.school.id}/events/${eventId}`, {
         method: "PUT",
         body: JSON.stringify({
@@ -557,6 +737,14 @@
   async function deleteEvent(event) {
     if (!window.confirm(`确定删除“${event.title}”吗？`)) return;
     try {
+      if (STATIC_HOST) {
+        state.school.customEvents = state.school.customEvents.filter((item) => item.id !== event.id);
+        state.school.version = Number(state.school.version || 1) + 1;
+        saveStaticSchool(state.school);
+        renderWorkspace();
+        setStatus("事件已删除。");
+        return;
+      }
       await api(`/schools/${state.school.id}/events/${event.id}`, { method: "DELETE" });
       await loadSchool(state.school.id);
       setStatus("事件已删除。");
@@ -613,6 +801,17 @@
 
   async function init() {
     bind();
+    if (STATIC_HOST) {
+      state.school = readStaticSchool();
+      state.owned = [staticOwnedEntry(state.school)];
+      state.token = "local";
+      renderOwned();
+      $("ownedSchoolSelect").value = state.school.id;
+      renderWorkspace();
+      $("creatorWorkspace").classList.remove("hidden");
+      setStatus("GitHub 版使用当前浏览器保存学校设置，六套皮肤和自定义事件均可直接试玩。");
+      return;
+    }
     try {
       const available = await api("/schools");
       const availableIds = new Set(available.map((school) => school.id));

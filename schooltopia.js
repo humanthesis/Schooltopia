@@ -1,6 +1,9 @@
 (function () {
   const API = "/api";
-  const STATIC_HOST = window.location.hostname.endsWith(".github.io");
+  const STATIC_SCHOOL_KEY = "schooltopia_static_school_v1";
+  const STATIC_HOST =
+    window.location.hostname.endsWith(".github.io") ||
+    new URLSearchParams(window.location.search).has("static");
   const PROFILE_KEY = "schooltopia_research_profile";
   const CLIENT_KEY = "schooltopia_anonymous_client";
   const state = {
@@ -31,6 +34,42 @@
       localStorage.setItem(PROFILE_KEY, JSON.stringify(state.profile));
     } catch {
       // The game remains playable when storage is unavailable.
+    }
+  }
+
+  function readStaticConfig() {
+    const fallback = {
+      id: "local-school",
+      name: "未命名学校",
+      tagline: "每所学校都有自己的生存规则。",
+      skin: {
+        primary: "#245f61",
+        accent: "#d09a39",
+        danger: "#b64d3f",
+        sky: "#10242b",
+      },
+      weights: {
+        eventFrequency: 1,
+        academicPressure: 1,
+        socialSupport: 1,
+        recovery: 1,
+        trustSensitivity: 1,
+      },
+      version: 1,
+      customEvents: [],
+    };
+    try {
+      const stored = JSON.parse(localStorage.getItem(STATIC_SCHOOL_KEY) || "null");
+      if (!stored) return fallback;
+      return {
+        ...fallback,
+        ...stored,
+        skin: { ...fallback.skin, ...(stored.skin || {}) },
+        weights: { ...fallback.weights, ...(stored.weights || {}) },
+        customEvents: Array.isArray(stored.customEvents) ? stored.customEvents : [],
+      };
+    } catch {
+      return fallback;
     }
   }
 
@@ -123,7 +162,12 @@
     const select = document.getElementById("schoolSelect");
     if (STATIC_HOST) {
       state.online = false;
-      if (select) select.innerHTML = '<option value="demo-school">GitHub 离线示例学校</option>';
+      const config = readStaticConfig();
+      applyConfig(config);
+      if (select) {
+        select.innerHTML = `<option value="${config.id}">${config.name}</option>`;
+        select.value = config.id;
+      }
       setConnectionStatus(false, "GitHub 离线试玩，不上传数据");
       bindFeedbackForm();
       return;

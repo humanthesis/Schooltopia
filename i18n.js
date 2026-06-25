@@ -26,6 +26,16 @@
     "开始游戏": "Start Game",
     "存档选择": "Save Slots",
     "本地 3 个槽位": "3 local slots",
+    "还没有保存过进度。": "No saved progress yet.",
+    "空槽位": "Empty Slot",
+    "读取": "Load",
+    "清空": "Clear",
+    "未知时间": "Unknown time",
+    "选择槽位保存当前进度": "Choose a slot to save your progress",
+    "事件处理中暂不能保存": "Saving is unavailable during an event",
+    "校园行动第一轮": "Campus Action Round 1",
+    "校园行动第二轮": "Campus Action Round 2",
+    "第一轮已跳过": "Round 1 Skipped",
     "试玩研究档案": "Player Research Profile",
     "正在连接匿名研究": "Connecting anonymous research",
     "匿名研究已连接": "Anonymous research connected",
@@ -150,6 +160,10 @@
     "属性变化": "Stat Changes",
     "Schooltopia Studio": "Schooltopia Studio",
     "学校版本编辑器": "School Version Editor",
+    "编辑步骤": "School Editing Steps",
+    "学校实时预览": "Live School Preview",
+    "当前学校配色": "Current School Colors",
+    "学校专属游戏链接": "School Game Link",
     "SCHOOLTOPIA / CAMPUS STUDIO": "SCHOOLTOPIA / CAMPUS STUDIO",
     "搭建你的": "Build Your",
     "校园世界": "Campus World",
@@ -202,6 +216,12 @@
     "触发率": "Trigger Rate",
     "启用": "Enabled",
     "操作": "Actions",
+    "规则": "Rules",
+    "周期": "Cycle",
+    "12 周": "12 Weeks",
+    "保存": "Save",
+    "删除": "Delete",
+    "编辑节点": "Edit Nodes",
     "还没有事件。写下第一件属于你学校的校园经历。": "No events yet. Write the first campus moment from your school.",
     "进入游戏并分享": "Play and Share",
     "专属链接会载入当前学校的皮肤、事件和变量权重。": "The school link loads this school's skin, events, and variable weights.",
@@ -209,9 +229,13 @@
     "进入我的学校": "Enter My School",
     "自定义剧情节点": "Customize Story Nodes",
     "事件说明": "Event Description",
+    "事件开场描述": "Event Opening",
     "教师路线会自动把智慧、体能、心情、同学好感和班主任信任映射为对应的教师属性。": "Teacher route maps wisdom, stamina, mood, peer favor, and homeroom trust to matching teacher stats.",
     "取消": "Cancel",
     "保存节点": "Save Nodes",
+    "保存三个节点": "Save Three Nodes",
+    "关闭节点编辑器": "Close Node Editor",
+    "关闭": "Close",
     "选项名称": "Choice Name",
     "选项说明": "Choice Description",
     "选择后的属性变化": "Stat Changes After Choice",
@@ -232,6 +256,14 @@
     "这个浏览器没有编辑权限。请用创建该学校的浏览器打开，或重新创建一个学校版本。": "This browser does not have edit access. Open it in the browser that created the school, or create a new school version.",
     "未命名学校": "Untitled School",
     "南山实验学校": "Nanshan Experimental School",
+    "森林黑板": "Forest Chalkboard",
+    "海盐蓝": "Sea Salt Blue",
+    "运动场": "Track and Field",
+    "旧图书馆": "Old Library",
+    "未来实验室": "Future Laboratory",
+    "晚自习": "Evening Study",
+    "GitHub 版使用当前浏览器保存学校设置，六套皮肤和自定义事件均可直接试玩。": "The GitHub version saves school settings in this browser. All six skins and custom events are ready to use.",
+    "浏览器无法保存学校设置，请保持本页面打开。": "The browser cannot save school settings. Keep this page open.",
     "例如：南山实验学校": "Example: Nanshan Experimental School",
     "例如：期中考试、社团汇演和小组展示撞在同一周。": "Example: midterms, club show, and group presentation all land in the same week.",
     "例如：最难受的是作业集中在同一周，恢复行动又太少。": "Example: the hardest part is homework piling into one week with too few recovery options.",
@@ -382,6 +414,20 @@
     if (current === "en") {
       let match = line.match(/^剩余 (\d+) 点$/);
       if (match) return `${match[1]} points left`;
+      match = line.match(/^还需分配 (\d+) 点$/);
+      if (match) return `${match[1]} points still unassigned`;
+      match = line.match(/^存档 (\d+)$/);
+      if (match) return `Save Slot ${match[1]}`;
+      match = line.match(/^保存 (\d+)$/);
+      if (match) return `Save ${match[1]}`;
+      match = line.match(/^保存时间：(.+)$/);
+      if (match) return `Saved: ${match[1]}`;
+      match = line.match(/^(.+) ([+-]1)$/);
+      if (match && EN[match[1]]) return `${EN[match[1]]} ${match[2]}`;
+      match = line.match(/^(学生路线|教师路线) · 第 (\d+) 周 · (校园行动第一轮|校园行动第二轮|第一轮已跳过) · (.+)$/);
+      if (match) return `${phrase(match[1])} · Week ${match[2]} · ${phrase(match[3])} · ${phrase(match[4])}`;
+      match = line.match(/^启用 (.+)$/);
+      if (match) return `Enable ${match[1]}`;
       match = line.match(/^规则版本 v(\d+)$/);
       if (match) return `Rules v${match[1]}`;
       match = line.match(/^第 (\d+) 周$/);
@@ -415,6 +461,20 @@
     } else {
       let match = line.match(/^(\d+) points left$/);
       if (match) return `剩余 ${match[1]} 点`;
+      match = line.match(/^(\d+) points still unassigned$/);
+      if (match) return `还需分配 ${match[1]} 点`;
+      match = line.match(/^Save Slot (\d+)$/);
+      if (match) return `存档 ${match[1]}`;
+      match = line.match(/^Save (\d+)$/);
+      if (match) return `保存 ${match[1]}`;
+      match = line.match(/^Saved: (.+)$/);
+      if (match) return `保存时间：${match[1]}`;
+      match = line.match(/^(.+) ([+-]1)$/);
+      if (match && ZH[match[1]]) return `${ZH[match[1]]} ${match[2]}`;
+      match = line.match(/^(Student Route|Teacher Route) · Week (\d+) · (Campus Action Round 1|Campus Action Round 2|Round 1 Skipped) · (.+)$/);
+      if (match) return `${phrase(match[1])} · 第 ${match[2]} 周 · ${phrase(match[3])} · ${phrase(match[4])}`;
+      match = line.match(/^Enable (.+)$/);
+      if (match) return `启用 ${match[1]}`;
       match = line.match(/^Rules v(\d+)$/);
       if (match) return `规则版本 v${match[1]}`;
       match = line.match(/^Week (\d+)$/);
