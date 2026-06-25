@@ -13,7 +13,18 @@ body {
 
 .creator-topbar {
   z-index: 40;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 14px;
   background: var(--creator-deep);
+}
+
+.creator-topbar .brand-block {
+  min-width: 0;
+}
+
+.creator-top-actions {
+  justify-content: flex-end;
 }
 
 .creator-top-actions,
@@ -111,6 +122,7 @@ body {
 }
 
 .creator-return-link {
+  justify-content: center;
   gap: 9px;
   min-height: 46px;
   padding: 0 18px;
@@ -119,6 +131,7 @@ body {
   border-color: var(--creator-warm);
   box-shadow: 0 7px 18px rgba(0, 0, 0, 0.18);
   font-size: 0.86rem;
+  white-space: nowrap;
 }
 
 .creator-return-link:hover {
@@ -1187,8 +1200,10 @@ body {
 
 @media (max-width: 680px) {
   .creator-topbar {
-    min-height: 60px;
-    padding: 8px 10px;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 8px 10px;
+    min-height: 104px;
+    padding: 8px 10px 10px;
   }
 
   .creator-topbar .brand-block {
@@ -1210,6 +1225,12 @@ body {
 
   .creator-audio-controls {
     gap: 5px;
+  }
+
+  .creator-top-actions {
+    grid-column: 1 / -1;
+    width: 100%;
+    justify-content: space-between;
   }
 
   .creator-audio-button {
@@ -1235,20 +1256,15 @@ body {
   }
 
   .creator-topbar .back-link {
-    width: 42px;
+    width: auto;
     min-height: 42px;
-    padding: 0;
+    padding: 0 13px;
     justify-content: center;
     font-size: 0.78rem;
   }
 
-  .creator-topbar .back-link > span:last-child {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
+  .creator-status {
+    top: 104px;
   }
 
   .creator-shell {

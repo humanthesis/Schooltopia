@@ -117,6 +117,46 @@
     return { id: school.id, name: school.name, token: "local" };
   }
 
+  function localizedText(value) {
+    return window.SchooltopiaI18n?.phrase?.(String(value ?? "")) ?? String(value ?? "");
+  }
+
+  function localizeKnownInput(input) {
+    if (!input) return;
+    const knownValues = [
+      "未命名学校",
+      "Untitled School",
+      "每所学校都有自己的生存规则。",
+      "Every school has its own survival rules.",
+      "正面处理",
+      "Face It",
+      "找人合作",
+      "Seek Support",
+      "先保护状态",
+      "Protect Yourself",
+      "直接解决问题，收益更明显，也可能付出代价。",
+      "Address the problem directly for a stronger result, with a possible cost.",
+      "借助关系网络缓冲压力。",
+      "Use your support network to soften the pressure.",
+      "减少眼前损耗，但问题不会完全消失。",
+      "Reduce the immediate strain, though the problem will not fully disappear.",
+    ];
+    if (knownValues.includes(input.value)) input.value = localizedText(input.value);
+  }
+
+  function localizeCreatorInputs() {
+    localizeKnownInput($("creatorNameInput"));
+    localizeKnownInput($("creatorTaglineInput"));
+    document.querySelectorAll(".node-option-label, .node-option-detail").forEach(localizeKnownInput);
+    if (state.school) {
+      const name = $("creatorNameInput").value || localizedText(state.school.name);
+      const tagline = $("creatorTaglineInput").value || localizedText(state.school.tagline || DEFAULT_STATIC_SCHOOL.tagline);
+      $("creatorPreviewName").textContent = name;
+      $("railSchoolName").textContent = name;
+      $("creatorPreviewTagline").textContent = tagline;
+    }
+  }
+
   async function api(path, options = {}) {
     const response = await fetch(`${API}${path}`, {
       ...options,
@@ -145,9 +185,11 @@
   function renderOwned() {
     const wrap = $("ownedSchoolWrap");
     wrap.classList.toggle("hidden", !state.owned.length);
+    const selected = $("ownedSchoolSelect").value;
     $("ownedSchoolSelect").innerHTML = state.owned
-      .map((school) => `<option value="${escapeHtml(school.id)}">${escapeHtml(school.name)}</option>`)
+      .map((school) => `<option value="${escapeHtml(school.id)}">${escapeHtml(localizedText(school.name))}</option>`)
       .join("");
+    if (state.owned.some((school) => school.id === selected)) $("ownedSchoolSelect").value = selected;
   }
 
   async function createSchool() {
@@ -238,15 +280,15 @@
   function renderWorkspace() {
     const school = state.school;
     const eventCount = (school.customEvents || []).length;
-    $("creatorNameInput").value = school.name;
-    $("creatorTaglineInput").value = school.tagline || "";
+    $("creatorNameInput").value = localizedText(school.name);
+    $("creatorTaglineInput").value = localizedText(school.tagline || "");
     $("creatorPrimary").value = school.skin.primary;
     $("creatorAccent").value = school.skin.accent;
     $("creatorDanger").value = school.skin.danger;
     $("creatorSky").value = school.skin.sky;
-    $("creatorPreviewName").textContent = school.name;
-    $("creatorPreviewTagline").textContent = school.tagline || "每所学校都有自己的生存规则。";
-    $("railSchoolName").textContent = school.name;
+    $("creatorPreviewName").textContent = localizedText(school.name);
+    $("creatorPreviewTagline").textContent = localizedText(school.tagline || "每所学校都有自己的生存规则。");
+    $("railSchoolName").textContent = localizedText(school.name);
     $("railEventCount").textContent = `${eventCount} 个校园事件`;
     $("previewEventCount").textContent = String(eventCount);
     renderSkinPreview();
@@ -487,6 +529,7 @@
     button.disabled = true;
     try {
       if (STATIC_HOST) {
+        const english = window.SchooltopiaI18n?.language === "en";
         const title = prompt.replace(/[。！？!?\n].*$/, "").slice(0, 18) || "校园新事件";
         const event = {
           id: `school_event_${Date.now().toString(36)}`,
@@ -500,20 +543,26 @@
           options: [
             {
               id: "face_it",
-              label: "正面处理",
-              detail: "直接解决问题，收益更明显，也可能付出代价。",
+              label: english ? "Face It" : "正面处理",
+              detail: english
+                ? "Address the problem directly for a stronger result, with a possible cost."
+                : "直接解决问题，收益更明显，也可能付出代价。",
               effects: [{ stat: "wisdom", delta: 2 }, { stat: "mood", delta: -1 }],
             },
             {
               id: "seek_support",
-              label: "找人合作",
-              detail: "借助关系网络缓冲压力。",
+              label: english ? "Seek Support" : "找人合作",
+              detail: english
+                ? "Use your support network to soften the pressure."
+                : "借助关系网络缓冲压力。",
               effects: [{ stat: "peerFavor", delta: 2 }, { stat: "homeroomTrust", delta: 1 }],
             },
             {
               id: "protect_self",
-              label: "先保护状态",
-              detail: "减少眼前损耗，但问题不会完全消失。",
+              label: english ? "Protect Yourself" : "先保护状态",
+              detail: english
+                ? "Reduce the immediate strain, though the problem will not fully disappear."
+                : "减少眼前损耗，但问题不会完全消失。",
               effects: [{ stat: "stamina", delta: 2 }, { stat: "mood", delta: 1 }],
             },
           ],
@@ -612,8 +661,8 @@
       card.innerHTML = `
         <header><span>NODE ${String(index + 1).padStart(2, "0")}</span><strong>玩家选择 ${index + 1}</strong></header>
         <div class="node-copy-fields">
-          <label>选项名称<input class="node-option-label" maxlength="60" value="${escapeHtml(option.label)}" /></label>
-          <label>选项说明<textarea class="node-option-detail" rows="2" maxlength="180">${escapeHtml(option.detail)}</textarea></label>
+          <label>选项名称<input class="node-option-label" maxlength="60" value="${escapeHtml(localizedText(option.label))}" /></label>
+          <label>选项说明<textarea class="node-option-detail" rows="2" maxlength="180">${escapeHtml(localizedText(option.detail))}</textarea></label>
         </div>
         <div class="node-effects-head"><strong>选择后的属性变化</strong><button class="add-node-effect" type="button">＋ 添加变化</button></div>
         <div class="node-effect-list"></div>
@@ -796,6 +845,10 @@
     });
     $("creatorTaglineInput").addEventListener("input", () => {
       $("creatorPreviewTagline").textContent = $("creatorTaglineInput").value || "每所学校都有自己的生存规则。";
+    });
+    window.addEventListener("schooltopia-language-change", () => {
+      renderOwned();
+      localizeCreatorInputs();
     });
   }
 
