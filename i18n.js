@@ -11,6 +11,7 @@
     "声音设置": "Sound Settings",
     "背景音乐：Gymnopédie No.1": "Background music: Gymnopedie No.1",
     "创建器音效": "Creator sound effects",
+    "重新加载 3D": "Reload 3D",
     "可配置校园生存模拟引擎": "Configurable Campus Survival Simulator",
     "示例学校": "Demo School",
     "每所学校都有自己的生存规则。": "Every school has its own survival rules.",
