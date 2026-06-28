@@ -8,13 +8,17 @@
       content="Schooltopia 是一款可由不同学校配置事件、皮肤和变量权重的 12 周校园生存模拟游戏。"
     />
     <meta name="theme-color" content="#17201d" />
+    <link rel="canonical" href="https://humanthesis.github.io/Schooltopia/" />
     <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://humanthesis.github.io/Schooltopia/" />
+    <meta property="og:locale" content="zh_CN" />
+    <meta property="og:locale:alternate" content="en_US" />
     <meta property="og:title" content="Schooltopia 校园生存模拟器" />
     <meta
       property="og:description"
       content="把真实校园事件生成剧情节点，通过匿名试玩数据理解学生压力与校园体验。"
     />
-    <meta property="og:image" content="share-cover.png" />
+    <meta property="og:image" content="https://humanthesis.github.io/Schooltopia/share-cover.png" />
     <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
@@ -24,19 +28,23 @@
       name="twitter:description"
       content="同一套校园生存引擎，不同学校拥有自己的事件、皮肤和规则。"
     />
-    <meta name="twitter:image" content="share-cover.png" />
+    <meta name="twitter:image" content="https://humanthesis.github.io/Schooltopia/share-cover.png" />
     <title>Schooltopia</title>
     <link
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2317201d'/%3E%3Cpath d='M10 43h44v7H10z' fill='%23f0c55f'/%3E%3Cpath d='M15 24h34v20H15z' fill='%23247a86'/%3E%3Cpath d='M12 20h40v6H12z' fill='%23b34536'/%3E%3Cpath d='M22 31h6v8h-6zm14 0h6v8h-6z' fill='%23fff7e6'/%3E%3C/svg%3E"
     />
-    <link rel="stylesheet" href="styles.css?v=20260626-1" />
+    <link rel="stylesheet" href="styles.css?v=20260628-2" />
   </head>
   <body>
     <main class="app-shell">
       <section class="top-band">
         <canvas id="campusCanvas" width="1200" height="320" aria-hidden="true"></canvas>
         <div class="top-links">
+          <a class="play-link" href="#setupView">
+            <span class="play-mark" aria-hidden="true"></span>
+            <span>立即开始</span>
+          </a>
           <a class="creator-link" href="creator.html">
             <span class="school-create-mark" aria-hidden="true"></span>
             <span>创建学校</span>
@@ -44,13 +52,13 @@
           <button id="languageToggle" class="language-toggle" type="button" data-lang-toggle>English</button>
         </div>
         <div class="audio-controls" aria-label="声音设置">
-          <button id="musicToggle" class="sound-toggle" type="button" aria-pressed="true" title="背景音乐：Gymnopédie No.1">
+          <button id="musicToggle" class="sound-toggle" type="button" aria-pressed="false" title="背景音乐：Gymnopédie No.1">
             <span class="music-mark" aria-hidden="true"></span>
-            <span id="musicLabel">音乐 开</span>
+            <span id="musicLabel">音乐 关</span>
           </button>
-          <button id="soundToggle" class="sound-toggle" type="button" aria-pressed="true">
+          <button id="soundToggle" class="sound-toggle" type="button" aria-pressed="false">
             <span class="sound-mark" aria-hidden="true"></span>
-            <span id="soundLabel">音效 开</span>
+            <span id="soundLabel">音效 关</span>
           </button>
         </div>
         <div class="title-block">
@@ -88,6 +96,7 @@
           </div>
           <div id="attributeSetup" class="attribute-setup"></div>
           <p class="setup-hint">用 + / - 调整属性点，单项最低为 3。把剩余属性点全部分配完后，开始游戏按钮就会亮起。</p>
+          <button id="recommendedSetup" class="secondary-action compact-action" type="button">一键均衡分配</button>
           <button id="startGame" class="primary-action" type="button">开始游戏</button>
         </div>
 
@@ -125,7 +134,13 @@
             <button type="button" data-value="social">社交型</button>
             <button type="button" data-value="balanced">平衡型</button>
           </div>
-          <p class="privacy-note">仅记录匿名设备编号、路线、选项、属性变化、结局与主动反馈，不收集姓名或联系方式。</p>
+          <p id="privacyNote" class="privacy-note">只有在你明确同意后才会记录研究数据；你可以随时清除本机研究标识。</p>
+          <label id="researchConsentWrap" class="research-consent" for="researchConsent">
+            <input id="researchConsent" type="checkbox" />
+            <span>我同意记录匿名路线、选择、属性变化、结局与主动反馈，用于校园体验研究。</span>
+          </label>
+          <button id="deleteResearchData" class="privacy-delete-button" type="button">清除我的研究数据</button>
+          <p class="retention-note">在线研究记录最多保留 180 天；反馈请勿填写姓名或可识别个人的信息。</p>
         </div>
       </section>
 
@@ -148,7 +163,7 @@
           <div id="statsList" class="stats-list"></div>
           <div id="changeFeedWrap" class="change-feed-wrap">
             <strong>本次变化</strong>
-            <div id="changeFeed" class="change-feed"></div>
+            <div id="changeFeed" class="change-feed" aria-live="polite" aria-atomic="true"></div>
           </div>
           <div id="aiHabitPanel" class="ai-habit-panel hidden"></div>
           <div class="ledger">
@@ -193,7 +208,7 @@
             <span>系统记录</span>
             <small id="roundState">等待行动</small>
           </div>
-          <div id="logList" class="log-list"></div>
+          <div id="logList" class="log-list" aria-live="polite" aria-relevant="additions"></div>
         </section>
       </section>
 
@@ -265,9 +280,9 @@
             <button id="closeCodex" class="secondary-action compact-action" type="button">返回</button>
           </div>
           <div class="codex-tabs" role="tablist" aria-label="图鉴分类">
-            <button class="codex-tab active" type="button" data-codex-tab="events">事件</button>
-            <button class="codex-tab" type="button" data-codex-tab="endings">结局</button>
-            <button class="codex-tab" type="button" data-codex-tab="achievements">成就</button>
+            <button id="codexTabEvents" class="codex-tab active" type="button" role="tab" aria-selected="true" aria-controls="codexGrid" tabindex="0" data-codex-tab="events">事件</button>
+            <button id="codexTabEndings" class="codex-tab" type="button" role="tab" aria-selected="false" aria-controls="codexGrid" tabindex="-1" data-codex-tab="endings">结局</button>
+            <button id="codexTabAchievements" class="codex-tab" type="button" role="tab" aria-selected="false" aria-controls="codexGrid" tabindex="-1" data-codex-tab="achievements">成就</button>
           </div>
           <div class="codex-tools" aria-label="图鉴重置">
             <button id="resetCodexEvents" class="secondary-action compact-action danger-action" type="button">重置事件</button>
@@ -276,7 +291,7 @@
             <button id="resetCodexAll" class="secondary-action compact-action danger-action" type="button">重置全部</button>
           </div>
           <div id="codexSummary" class="codex-summary"></div>
-          <div id="codexGrid" class="codex-grid"></div>
+          <div id="codexGrid" class="codex-grid" role="tabpanel" aria-labelledby="codexTabEvents" tabindex="0"></div>
         </div>
       </section>
     </main>
@@ -299,8 +314,9 @@
       </div>
     </div>
 
-    <script src="i18n.js?v=20260626-1"></script>
-    <script src="schooltopia.js?v=20260626-1"></script>
-    <script src="game.js?v=20260626-1"></script>
+    <script src="i18n.js?v=20260628-2"></script>
+    <script src="shared-config.js?v=20260628-2"></script>
+    <script src="schooltopia.js?v=20260628-2"></script>
+    <script src="game.js?v=20260628-2"></script>
   </body>
 </html>

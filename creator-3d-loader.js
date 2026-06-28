@@ -28,7 +28,7 @@
     hero.classList.remove("scene-failed");
     retryButton?.classList.add("hidden");
     const script = document.createElement("script");
-    script.src = `creator-3d.bundle.js?v=20260622-${attempt}`;
+    script.src = `creator-3d.bundle.js?v=20260628-2${attempt > 1 ? `&retry=${attempt}` : ""}`;
     script.async = true;
     script.addEventListener("error", () => {
       script.remove();

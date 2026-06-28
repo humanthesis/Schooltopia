@@ -2,6 +2,7 @@ const http = require("http");
 const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
+const { generateEventDraft } = require("./event-generator");
 
 const ROOT = __dirname;
 const DATA_DIR = path.join(ROOT, "data");
@@ -153,7 +154,30 @@ async function readBody(req) {
 }
 
 function cleanText(value, maxLength = 240) {
-  return String(value || "").trim().slice(0, maxLength);
+  return String(value || "")
+    .replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "")
+    .trim()
+    .slice(0, maxLength);
+}
+
+const RESEARCH_RETENTION_MS = 180 * 24 * 60 * 60 * 1000;
+
+function pruneResearchData(research, now = Date.now()) {
+  const cutoff = now - RESEARCH_RETENTION_MS;
+  const expiredSessionIds = new Set(
+    research.sessions
+      .filter((session) => {
+        const timestamp = Date.parse(session.completedAt || session.startedAt || 0);
+        return Number.isFinite(timestamp) && timestamp < cutoff;
+      })
+      .map((session) => session.id)
+  );
+  if (!expiredSessionIds.size) return 0;
+  research.sessions = research.sessions.filter((session) => !expiredSessionIds.has(session.id));
+  research.choices = research.choices.filter((choice) => !expiredSessionIds.has(choice.sessionId));
+  research.feedback = research.feedback.filter((feedback) => !expiredSessionIds.has(feedback.sessionId));
+  research.reportSnapshots = research.reportSnapshots.filter((report) => !expiredSessionIds.has(report.sessionId));
+  return expiredSessionIds.size;
 }
 
 function cleanId(value) {
@@ -234,50 +258,25 @@ function invertEffects(effects) {
 }
 
 function generateEvent(prompt, route = "student") {
-  const safePrompt = cleanText(prompt, 320);
-  const category = classifyPrompt(safePrompt);
-  const resolvedRoute = ["student", "teacher", "both"].includes(route) ? route : "student";
-  const effectRoute = "student";
-  const mainEffects = effectsForCategory(category, effectRoute);
-  const titleSource = safePrompt.replace(/[。！？!?\n].*$/, "");
-  const title = titleSource.slice(0, 18) || "校园新事件";
-  return {
-    id: `school_event_${crypto.randomUUID().slice(0, 8)}`,
-    title,
-    category,
-    route: resolvedRoute,
-    description: safePrompt || "学校里发生了一件需要做出选择的事。",
-    chance: 22,
-    enabled: true,
-    generated: true,
-    options: [
-      {
-        id: "face_it",
-        label: "正面处理",
-        detail: "直接解决问题，收益更明显，也可能付出代价。",
-        effects: mainEffects.map(([stat, delta]) => ({ stat, delta })),
-      },
-      {
-        id: "seek_support",
-        label: "找人合作",
-        detail: "借助关系网络缓冲压力。",
-        effects: effectsForCategory("social", effectRoute).map(([stat, delta]) => ({ stat, delta })),
-      },
-      {
-        id: "protect_self",
-        label: "先保护状态",
-        detail: "减少眼前损耗，但问题不会完全消失。",
-        effects: effectsForCategory("wellbeing", effectRoute).map(([stat, delta]) => ({ stat, delta })),
-      },
-      {
-        id: "ignore_it",
-        label: "假装没看见",
-        detail: "暂时省事，但可能留下后果。",
-        effects: invertEffects(mainEffects).map(([stat, delta]) => ({ stat, delta })),
-      },
-    ].slice(0, 3),
-    createdAt: new Date().toISOString(),
+  return generateEventDraft(cleanText(prompt, 320), route);
+}
+
+function sanitizeEventTranslations(input = {}, existing = {}) {
+  const sanitizeLanguage = (language, fallback = {}) => {
+    if (!language && !fallback) return null;
+    return {
+      title: cleanText(language?.title ?? fallback?.title, 60),
+      description: cleanText(language?.description ?? fallback?.description, 360),
+      options: Array.from({ length: 3 }, (_, index) => ({
+        id: cleanId(language?.options?.[index]?.id || fallback?.options?.[index]?.id) || `choice_${index + 1}`,
+        label: cleanText(language?.options?.[index]?.label ?? fallback?.options?.[index]?.label, 60),
+        detail: cleanText(language?.options?.[index]?.detail ?? fallback?.options?.[index]?.detail, 180),
+      })),
+    };
   };
+  const zh = sanitizeLanguage(input.zh, existing.zh);
+  const en = sanitizeLanguage(input.en, existing.en);
+  return zh || en ? { zh, en } : undefined;
 }
 
 function sanitizeEventEffects(input, fallback = []) {
@@ -315,6 +314,8 @@ function sanitizeEvent(existing, input) {
     chance: clamp(input.chance ?? existing.chance, 1, 100),
     enabled: input.enabled === undefined ? existing.enabled : Boolean(input.enabled),
     options: sanitizeEventOptions(input.options, existing.options),
+    sourceLanguage: input.sourceLanguage === "en" ? "en" : existing.sourceLanguage || "zh",
+    translations: sanitizeEventTranslations(input.translations, existing.translations),
     updatedAt: new Date().toISOString(),
   };
 }
@@ -707,6 +708,7 @@ async function handleApi(req, res, url) {
   research.feedback ||= [];
   research.iterations ||= [];
   research.reportSnapshots ||= [];
+  if (pruneResearchData(research)) writeJson(RESEARCH_FILE, research);
   const parts = url.pathname.split("/").filter(Boolean);
 
   if (req.method === "GET" && url.pathname === "/api/health") {
@@ -809,10 +811,15 @@ async function handleApi(req, res, url) {
 
   if (req.method === "POST" && url.pathname === "/api/sessions/start") {
     const body = await readBody(req);
+    const deletionKey = cleanText(body.deletionKey, 128);
+    if (body.researchConsent !== true || deletionKey.length < 16) {
+      return sendError(res, 400, "需要明确同意研究记录，并提供有效的删除凭证");
+    }
     const school = schools.find((item) => item.id === cleanId(body.schoolId)) || schools[0];
     const session = {
       id: crypto.randomUUID(),
       clientId: cleanId(body.clientId) || crypto.randomUUID(),
+      clientDeletionHash: hashEditToken(deletionKey),
       schoolId: school.id,
       route: ["student", "teacher"].includes(body.route) ? body.route : "student",
       identity: cleanText(body.identity, 30),
@@ -825,6 +832,23 @@ async function handleApi(req, res, url) {
     research.sessions.push(session);
     writeJson(RESEARCH_FILE, research);
     return sendJson(res, 201, session);
+  }
+
+  if (req.method === "POST" && url.pathname === "/api/research/delete-client") {
+    const body = await readBody(req);
+    const clientId = cleanId(body.clientId);
+    const deletionHash = hashEditToken(cleanText(body.deletionKey, 128));
+    const authorized = research.sessions.some(
+      (session) => session.clientId === clientId && session.clientDeletionHash === deletionHash
+    );
+    if (!authorized) return sendError(res, 403, "删除凭证无效");
+    const sessionIds = new Set(research.sessions.filter((session) => session.clientId === clientId).map((session) => session.id));
+    research.sessions = research.sessions.filter((session) => !sessionIds.has(session.id));
+    research.choices = research.choices.filter((choice) => !sessionIds.has(choice.sessionId));
+    research.feedback = research.feedback.filter((feedback) => !sessionIds.has(feedback.sessionId));
+    research.reportSnapshots = research.reportSnapshots.filter((report) => !sessionIds.has(report.sessionId));
+    writeJson(RESEARCH_FILE, research);
+    return sendJson(res, 200, { deletedSessions: sessionIds.size });
   }
 
   if (parts[0] === "api" && parts[1] === "sessions" && parts[2]) {
@@ -932,6 +956,7 @@ module.exports = {
   generateEvent,
   hashEditToken,
   maybeAutoIterate,
+  pruneResearchData,
   resetSchoolConfig,
   saveRoundReport,
   sanitizeEvent,

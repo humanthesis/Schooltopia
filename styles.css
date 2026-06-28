@@ -85,6 +85,7 @@ p {
 
 .app-shell {
   min-height: 100vh;
+  min-height: 100dvh;
 }
 
 .top-band {
@@ -125,6 +126,7 @@ p {
 }
 
 .admin-link,
+.play-link,
 .creator-link {
   display: inline-flex;
   align-items: center;
@@ -140,26 +142,39 @@ p {
 }
 
 .admin-link:hover,
+.play-link:hover,
 .creator-link:hover {
   border-color: color-mix(in srgb, var(--school-accent) 70%, white);
   transform: translateY(-1px);
 }
 
+.play-link,
 .creator-link {
   gap: 9px;
   min-height: 46px;
   padding: 0 18px;
+  font-size: 0.9rem;
+}
+
+.play-link {
   color: #17201d;
   background: var(--school-accent);
   border-color: var(--school-accent);
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.24);
-  font-size: 0.9rem;
 }
 
-.creator-link:hover {
+.play-link:hover {
   color: #17201d;
   background: color-mix(in srgb, var(--school-accent) 82%, white);
   border-color: color-mix(in srgb, var(--school-accent) 72%, white);
+}
+
+.play-mark {
+  width: 0;
+  height: 0;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-left: 9px solid currentColor;
 }
 
 .language-toggle {
@@ -474,6 +489,43 @@ h1 {
   border-top: 1px solid var(--line);
   font-size: 0.78rem;
   line-height: 1.65;
+}
+
+.research-consent {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  align-items: start;
+  gap: 9px;
+  margin: 12px 16px 0;
+  color: #304b4f;
+  font-size: 0.78rem;
+  font-weight: 750;
+  line-height: 1.5;
+}
+
+.research-consent input {
+  width: 18px;
+  height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--teal);
+}
+
+.privacy-delete-button {
+  min-height: 36px;
+  margin: 10px 16px 0;
+  padding: 7px 11px;
+  color: #70433d;
+  border-color: rgba(179, 69, 54, 0.28);
+  background: rgba(255, 253, 245, 0.72);
+  font-size: 0.76rem;
+  font-weight: 850;
+}
+
+.retention-note {
+  margin: 8px 16px 16px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.45;
 }
 
 #researchConnection.offline {
@@ -1391,7 +1443,7 @@ h1 {
 }
 
 .log-entry:first-child::before {
-  content: "新";
+  content: "NEW";
   position: absolute;
   left: 11px;
   top: 13px;
@@ -1405,6 +1457,10 @@ h1 {
   font-size: 0.72rem;
   font-weight: 950;
   box-shadow: 0 8px 18px rgba(179, 69, 54, 0.2);
+}
+
+html[lang="zh-CN"] .log-entry:first-child::before {
+  content: "新";
 }
 
 @keyframes log-pop {
@@ -1615,7 +1671,7 @@ h1 {
 
 .modal-panel {
   width: min(720px, 100%);
-  max-height: min(800px, calc(100vh - 36px));
+  max-height: min(800px, calc(100dvh - 36px));
   overflow: auto;
   background:
     linear-gradient(180deg, rgba(255, 253, 245, 0.98), rgba(240, 246, 244, 0.98)),
@@ -1862,6 +1918,7 @@ h1 {
     left: 12px;
   }
 
+  .play-link,
   .creator-link {
     min-height: 44px;
     padding: 0 14px;

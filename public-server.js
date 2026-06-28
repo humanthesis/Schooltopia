@@ -10,6 +10,7 @@ const PUBLIC_FILES = new Set([
   "/index.html",
   "/styles.css",
   "/i18n.js",
+  "/shared-config.js",
   "/game.js",
   "/schooltopia.js",
   "/share-cover.png",
@@ -19,6 +20,7 @@ const PUBLIC_FILES = new Set([
   "/creator.css",
   "/creator.js",
   "/creator-audio.js",
+  "/event-generator.js",
   "/creator-3d-loader.js",
   "/creator-3d.bundle.js",
 ]);
@@ -33,6 +35,7 @@ function isPublicApi(method, pathname) {
   if (method === "POST" && /^\/api\/schools\/[a-zA-Z0-9_-]+\/events\/generate$/.test(pathname)) return true;
   if (["PUT", "DELETE"].includes(method) && /^\/api\/schools\/[a-zA-Z0-9_-]+\/events\/[a-zA-Z0-9_-]+$/.test(pathname)) return true;
   if (method === "POST" && pathname === "/api/sessions/start") return true;
+  if (method === "POST" && pathname === "/api/research/delete-client") return true;
   return method === "POST" && /^\/api\/sessions\/[a-zA-Z0-9_-]+\/(choice|end|feedback)$/.test(pathname);
 }
 

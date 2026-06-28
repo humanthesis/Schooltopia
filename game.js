@@ -147,7 +147,7 @@ const DIFFICULTIES = [
   {
     id: "easy",
     name: "轻松模式",
-    detail: "开局 14 点，随机事件更少，期末要求更低，适合先看剧情和收集图鉴。",
+    detail: "开局 14 点，随机事件更少，期末要求更低，适合熟悉规则和体验主线。",
     setupPoints: 14,
     eventMultiplier: 0.65,
     rareMultiplier: 0.55,
@@ -456,7 +456,7 @@ const CAMPUS_CHOICE_STYLES = {
     teacher: [["authority", 1], ["teacherStamina", 1], ["teacherMood", -1]],
   },
   risky: {
-    detail: "赌一把会多拿一点结果，但失败成本很高。",
+    detail: "直接追求更高结果，但会同时消耗体能和心情。",
     student: [["wisdom", 1], ["peerFavor", 1], ["stamina", -2], ["mood", -2]],
     teacher: [["authority", 1], ["studentFavor", 1], ["teacherStamina", -2], ["teacherMood", -2]],
   },
@@ -740,6 +740,7 @@ let game = null;
 let activeEventDone = null;
 let activeEvent = null;
 let lastFocusedElement = null;
+let codexLastFocusedElement = null;
 let activeOptionButtons = [];
 let activeCodexTab = "events";
 let codexReturnView = "setup";
@@ -768,6 +769,7 @@ const dom = {
   difficultyLabel: document.getElementById("difficultyLabel"),
   pointsLeft: document.getElementById("pointsLeft"),
   attributeSetup: document.getElementById("attributeSetup"),
+  recommendedSetup: document.getElementById("recommendedSetup"),
   startGame: document.getElementById("startGame"),
   saveSlotList: document.getElementById("saveSlotList"),
   openCodexSetup: document.getElementById("openCodexSetup"),
@@ -854,17 +856,17 @@ function shuffledCampusActivityIds() {
 
 function readSoundPreference() {
   try {
-    return localStorage.getItem("schooltopia_sound_enabled") !== "false";
+    return localStorage.getItem("schooltopia_sound_enabled") === "true";
   } catch {
-    return true;
+    return false;
   }
 }
 
 function readMusicPreference() {
   try {
-    return localStorage.getItem("schooltopia_music_enabled") !== "false";
+    return localStorage.getItem("schooltopia_music_enabled") === "true";
   } catch {
-    return true;
+    return false;
   }
 }
 
@@ -1270,9 +1272,9 @@ function readStoredSet(key) {
 
 function loadMetaSave() {
   try {
+    localStorage.removeItem("schooltopia_total_ai_copy");
     return {
       totalJingdezhenRunCount: Number(localStorage.getItem("schooltopia_total_jingdezhen") || 0),
-      totalAiCopyCount: Number(localStorage.getItem("schooltopia_total_ai_copy") || 0),
       unlockedEvents: readStoredSet("schooltopia_unlocked_events"),
       unlockedEndings: readStoredSet("schooltopia_unlocked_endings"),
       unlockedAchievements: readStoredSet("schooltopia_unlocked_achievements"),
@@ -1280,7 +1282,6 @@ function loadMetaSave() {
   } catch {
     return {
       totalJingdezhenRunCount: 0,
-      totalAiCopyCount: 0,
       unlockedEvents: new Set(),
       unlockedEndings: new Set(),
       unlockedAchievements: new Set(),
@@ -1291,7 +1292,6 @@ function loadMetaSave() {
 function cloneMetaSave(save) {
   return {
     totalJingdezhenRunCount: Number(save.totalJingdezhenRunCount || 0),
-    totalAiCopyCount: Number(save.totalAiCopyCount || 0),
     unlockedEvents: new Set(save.unlockedEvents || []),
     unlockedEndings: new Set(save.unlockedEndings || []),
     unlockedAchievements: new Set(save.unlockedAchievements || []),
@@ -1303,7 +1303,6 @@ function saveMetaSave() {
   if (!save) return;
   try {
     localStorage.setItem("schooltopia_total_jingdezhen", String(save.totalJingdezhenRunCount));
-    localStorage.setItem("schooltopia_total_ai_copy", String(save.totalAiCopyCount));
     localStorage.setItem("schooltopia_unlocked_events", JSON.stringify([...save.unlockedEvents]));
     localStorage.setItem("schooltopia_unlocked_endings", JSON.stringify([...save.unlockedEndings]));
     localStorage.setItem("schooltopia_unlocked_achievements", JSON.stringify([...save.unlockedAchievements]));
@@ -1747,6 +1746,12 @@ function rememberStatChange(statName, actual, requestedDelta) {
   game.recentChangedStats = new Set(game.recentChanges.filter((item) => item.actual !== 0).map((item) => item.statName));
 }
 
+function clearRecentChanges() {
+  if (!game) return;
+  game.recentChanges = [];
+  game.recentChangedStats = new Set();
+}
+
 function clearCompleteMadnessWarningIfRecovered(statName, actual) {
   if (
     game?.route === "student" &&
@@ -2022,7 +2027,7 @@ function checkImmediateEndings() {
       triggerEnding("ending_complete_madness");
       return;
     }
-    if (game.counters.aiCopyCount >= 20 || game.metaSave.totalAiCopyCount >= 20) {
+    if (game.counters.aiCopyCount >= 10) {
       triggerEnding("ending_ai_graduates_for_me");
     }
   }
@@ -2060,6 +2065,22 @@ function adjustSetupStat(statName, delta) {
   renderSetup();
 }
 
+function applyRecommendedSetup() {
+  setup.stats = makeStats(setup.route);
+  setup.points = setupPointTotal();
+  const statIds = ATTRIBUTES[setup.route].map((attribute) => attribute.id);
+  let index = 0;
+  while (setup.points > 0 && statIds.some((statName) => setup.stats[statName] < 10)) {
+    const statName = statIds[index % statIds.length];
+    if (setup.stats[statName] < 10) {
+      setup.stats[statName] += 1;
+      setup.points -= 1;
+    }
+    index += 1;
+  }
+  renderSetup();
+}
+
 function renderSetup() {
   dom.routeButtons.innerHTML = "";
   ROUTES.forEach((route) => {
@@ -2072,7 +2093,9 @@ function renderSetup() {
   });
 
   dom.identityButtons.innerHTML = "";
-  routeConfig().identities.forEach((identity) => {
+  const identities = routeConfig().identities;
+  dom.identityButtons.classList.toggle("hidden", identities.length <= 1);
+  identities.forEach((identity) => {
     const button = document.createElement("button");
     button.type = "button";
     button.className = `choice-button${setup.identity === identity.id ? " active" : ""}`;
@@ -2227,7 +2250,7 @@ function renderStats() {
     row.className = `stat tone-${attr.tone}${game.recentChangedStats.has(attr.id) ? " changed" : ""}`;
     row.innerHTML = `
       <div class="stat-top"><span>${attr.name}</span><span>${value}/${max}</span></div>
-      <div class="meter"><span style="width:${(value / max) * 100}%"></span></div>
+      <div class="meter" role="progressbar" aria-label="${attr.name}" aria-valuemin="0" aria-valuemax="${max}" aria-valuenow="${value}"><span style="width:${(value / max) * 100}%"></span></div>
     `;
     dom.statsList.append(row);
   });
@@ -2242,7 +2265,15 @@ function renderChangeFeed() {
     dom.changeFeed.append(empty);
     return;
   }
-  game.recentChanges.slice(0, 5).forEach((change) => {
+  const netChanges = [...game.recentChanges.reduce((changes, change) => {
+    const current = changes.get(change.statName) || { ...change, actual: 0 };
+    current.actual += Number(change.actual || 0);
+    current.value = change.value;
+    current.max = change.max;
+    changes.set(change.statName, current);
+    return changes;
+  }, new Map()).values()];
+  netChanges.slice(0, 5).forEach((change) => {
     const item = document.createElement("div");
     const tone = change.actual > 0 ? "positive" : change.actual < 0 ? "negative" : "neutral";
     const deltaText = change.actual === 0 ? "未变化" : `${change.actual > 0 ? "+" : ""}${change.actual}`;
@@ -2253,7 +2284,7 @@ function renderChangeFeed() {
 }
 
 function renderAIHabit() {
-  if (game.route !== "student") {
+  if (game.route !== "student" || game.counters.aiUseCount === 0) {
     dom.aiHabitPanel.classList.add("hidden");
     dom.aiHabitPanel.innerHTML = "";
     return;
@@ -2330,6 +2361,13 @@ function resetCodex(kind) {
   if (!ok) return;
   const save = getCodexSave();
   targets.forEach((target) => save[target.key].clear());
+  if (kind === "all") {
+    try {
+      localStorage.removeItem("schooltopia_total_ai_copy");
+    } catch {
+      // Legacy counters never affect the current run.
+    }
+  }
   saveMetaSave();
   renderCodex();
   if (game && !game.gameEnded) addLog(`${label}记录已重置。`);
@@ -2354,9 +2392,13 @@ function renderCodex() {
   });
 
   dom.codexTabs.forEach((button) => {
-    button.classList.toggle("active", button.dataset.codexTab === activeCodexTab);
-    button.setAttribute("aria-selected", button.dataset.codexTab === activeCodexTab ? "true" : "false");
+    const selected = button.dataset.codexTab === activeCodexTab;
+    button.classList.toggle("active", selected);
+    button.setAttribute("aria-selected", selected ? "true" : "false");
+    button.tabIndex = selected ? 0 : -1;
   });
+  const activeTab = dom.codexTabs.find((button) => button.dataset.codexTab === activeCodexTab);
+  if (activeTab) dom.codexGrid.setAttribute("aria-labelledby", activeTab.id);
 
   let entries = [];
   let unlocked = new Set();
@@ -2403,6 +2445,7 @@ function renderCodex() {
 }
 
 function openCodex(tab = activeCodexTab) {
+  codexLastFocusedElement = document.activeElement;
   if (!dom.gameView.classList.contains("hidden")) codexReturnView = "game";
   else if (!dom.endingView.classList.contains("hidden")) codexReturnView = "ending";
   else codexReturnView = "setup";
@@ -2412,6 +2455,7 @@ function openCodex(tab = activeCodexTab) {
   dom.endingView.classList.add("hidden");
   dom.codexView.classList.remove("hidden");
   renderCodex();
+  dom.codexTabs.find((button) => button.dataset.codexTab === activeCodexTab)?.focus();
 }
 
 function closeCodex() {
@@ -2423,6 +2467,8 @@ function closeCodex() {
   } else {
     dom.setupView.classList.remove("hidden");
   }
+  codexLastFocusedElement?.focus?.();
+  codexLastFocusedElement = null;
 }
 
 function renderLog() {
@@ -2474,6 +2520,7 @@ function renderActions(title, subtitle, actions) {
       const researchBefore = window.Schooltopia?.snapshot?.(game) || {};
       const researchWeek = game?.week || 0;
       const researchPhase = game?.currentActionPhase || "";
+      clearRecentChanges();
       action.run();
       window.Schooltopia?.recordChoice?.(
         {
@@ -3397,7 +3444,14 @@ function openEvent(event, onDone) {
     if (typeof button.setAttribute === "function") {
       button.setAttribute("aria-keyshortcuts", `${String.fromCharCode(65 + index)} ${index + 1}`);
     }
-    button.innerHTML = `<strong>${option.name}</strong>${option.detail ? `<span>${option.detail}</span>` : ""}`;
+    const name = document.createElement("strong");
+    name.textContent = option.name;
+    button.append(name);
+    if (option.detail) {
+      const detail = document.createElement("span");
+      detail.textContent = option.detail;
+      button.append(detail);
+    }
     button.addEventListener("click", () => {
       if (button.disabled) return;
       playSound("action");
@@ -3405,6 +3459,7 @@ function openEvent(event, onDone) {
       const researchBefore = window.Schooltopia?.snapshot?.(game) || {};
       const researchWeek = game?.week || 0;
       const researchPhase = game?.currentActionPhase || "event";
+      clearRecentChanges();
       option.run?.();
       window.Schooltopia?.recordChoice?.(
         {
@@ -4149,8 +4204,6 @@ function resolveAIChoice(choiceId, options = {}) {
     applyStatChange("student", "wisdom", -1, "choice_ai_copy_all");
     game.counters.aiCopyCount += 1;
     game.counters.aiUseCount += 1;
-    game.metaSave.totalAiCopyCount += 1;
-    saveMetaSave();
     const detectedChance = getAiCopyDetectionChance();
     addLog(`AI 风险判定：${detectedChance}%`);
     if (randomChance(detectedChance)) applyStatChange("student", "homeroomTrust", -2, "ai_copy_detected");
@@ -4679,7 +4732,7 @@ function collectStudentEndings() {
   const noSchoolRescued =
     finalWisdom >= 4 || game.flags.has("flag_final_project_success") || game.temp.examScore >= difficulty.examTarget;
 
-  if (game.counters.aiCopyCount >= 10 || game.metaSave.totalAiCopyCount >= 20) {
+  if (game.counters.aiCopyCount >= 10) {
     endings.push("ending_ai_graduates_for_me");
   }
   if (game.counters.absenceDays >= 35) endings.push("ending_disappeared_person");
@@ -5183,6 +5236,7 @@ document.addEventListener("visibilitychange", () => {
   if (soundEnabled) startPlaygroundAmbience();
 });
 dom.startGame.addEventListener("click", startGame);
+dom.recommendedSetup.addEventListener("click", applyRecommendedSetup);
 dom.restartGame.addEventListener("click", resetGame);
 dom.restartInGame.addEventListener("click", confirmRestartInGame);
 dom.openCodexSetup.addEventListener("click", () => openCodex("events"));
@@ -5198,6 +5252,19 @@ dom.codexTabs.forEach((button) => {
   button.addEventListener("click", () => {
     activeCodexTab = button.dataset.codexTab;
     renderCodex();
+  });
+  button.addEventListener("keydown", (event) => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const current = dom.codexTabs.indexOf(button);
+    const next = event.key === "Home"
+      ? 0
+      : event.key === "End"
+        ? dom.codexTabs.length - 1
+        : (current + (event.key === "ArrowRight" ? 1 : -1) + dom.codexTabs.length) % dom.codexTabs.length;
+    activeCodexTab = dom.codexTabs[next].dataset.codexTab;
+    renderCodex();
+    dom.codexTabs[next].focus();
   });
 });
 document.addEventListener("keydown", handleShortcut);

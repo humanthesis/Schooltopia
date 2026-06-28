@@ -6,6 +6,8 @@
     new URLSearchParams(window.location.search).has("static");
   const PROFILE_KEY = "schooltopia_research_profile";
   const CLIENT_KEY = "schooltopia_anonymous_client";
+  const CLIENT_SECRET_KEY = "schooltopia_research_delete_key";
+  const CONSENT_KEY = "schooltopia_research_consent";
   const state = {
     schools: [],
     config: null,
@@ -14,7 +16,16 @@
     sessionPromise: null,
     choiceQueue: Promise.resolve(),
     online: true,
+    consent: readConsent(),
   };
+
+  function readConsent() {
+    try {
+      return localStorage.getItem(CONSENT_KEY) === "true";
+    } catch {
+      return false;
+    }
+  }
 
   function loadProfile() {
     try {
@@ -54,7 +65,7 @@
   function readStaticConfig() {
     const fallback = {
       id: "local-school",
-      name: "未命名学校",
+      name: "Schooltopia",
       tagline: "每所学校都有自己的生存规则。",
       skin: {
         primary: "#245f61",
@@ -73,30 +84,44 @@
       customEvents: [],
     };
     try {
+      const shared = window.SchooltopiaShare?.readShareUrl?.(window.location.href);
+      if (shared) return shared;
       const stored = JSON.parse(localStorage.getItem(STATIC_SCHOOL_KEY) || "null");
       if (!stored) return fallback;
-      return {
+      return window.SchooltopiaShare?.normalizeConfig?.({
         ...fallback,
         ...stored,
         skin: { ...fallback.skin, ...(stored.skin || {}) },
         weights: { ...fallback.weights, ...(stored.weights || {}) },
         customEvents: Array.isArray(stored.customEvents) ? stored.customEvents : [],
-      };
+      }) || fallback;
     } catch {
       return fallback;
     }
   }
 
-  function getClientId() {
+  function randomIdentityPart(prefix) {
+    if (window.crypto?.randomUUID) return `${prefix}_${window.crypto.randomUUID().replace(/-/g, "")}`;
+    return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`;
+  }
+
+  function getClientIdentity(create = true) {
     try {
       let id = localStorage.getItem(CLIENT_KEY);
-      if (!id) {
-        id = `player_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+      let deletionKey = localStorage.getItem(CLIENT_SECRET_KEY);
+      if (create && !id) {
+        id = randomIdentityPart("player");
         localStorage.setItem(CLIENT_KEY, id);
       }
-      return id;
+      if (create && !deletionKey) {
+        deletionKey = randomIdentityPart("delete");
+        localStorage.setItem(CLIENT_SECRET_KEY, deletionKey);
+      }
+      return { id, deletionKey };
     } catch {
-      return `session_${Date.now().toString(36)}`;
+      return create
+        ? { id: randomIdentityPart("session"), deletionKey: randomIdentityPart("delete") }
+        : { id: "", deletionKey: "" };
     }
   }
 
@@ -121,6 +146,65 @@
     if (!status) return;
     status.classList.toggle("offline", !online);
     status.textContent = message || (online ? "匿名研究已连接" : "离线试玩，不上传数据");
+  }
+
+  function setPrivacyCopy() {
+    const note = document.getElementById("privacyNote");
+    const consentWrap = document.getElementById("researchConsentWrap");
+    const retention = document.querySelector(".retention-note");
+    const consent = document.getElementById("researchConsent");
+    if (consent) consent.checked = state.consent;
+    if (STATIC_HOST) {
+      consentWrap?.classList.add("hidden");
+      if (note) note.textContent = "GitHub 公开版的学校设置、选择与结局只保存在当前浏览器，不会上传。年级段和玩家倾向只用于本机回顾，不改变玩法。";
+      if (retention) retention.textContent = "清除浏览器网站数据即可删除这些本机记录。反馈框不会在离线版上传内容。";
+      return;
+    }
+    consentWrap?.classList.remove("hidden");
+    if (note) note.textContent = "只有在你明确同意后，系统才会记录匿名路线、选择、属性变化、结局与主动反馈。";
+    if (retention) retention.textContent = "在线研究记录最多保留 180 天；反馈请勿填写姓名或可识别个人的信息。";
+  }
+
+  function bindPrivacyControls() {
+    const consent = document.getElementById("researchConsent");
+    consent?.addEventListener("change", () => {
+      state.consent = Boolean(consent.checked);
+      try {
+        localStorage.setItem(CONSENT_KEY, state.consent ? "true" : "false");
+      } catch {
+        // Consent still applies to the current page session.
+      }
+      setConnectionStatus(state.online, state.consent ? "匿名研究已启用" : "匿名研究未启用");
+    });
+
+    document.getElementById("deleteResearchData")?.addEventListener("click", async () => {
+      if (!(window.confirm?.("清除本机研究设置，并删除服务器上与此匿名标识关联的记录吗？") ?? true)) return;
+      const identity = getClientIdentity(false);
+      if (state.online && identity.id && identity.deletionKey) {
+        try {
+          await api("/research/delete-client", {
+            method: "POST",
+            body: JSON.stringify({ clientId: identity.id, deletionKey: identity.deletionKey }),
+          });
+        } catch {
+          setConnectionStatus(false, "服务器记录暂时无法删除");
+          return;
+        }
+      }
+      try {
+        [CLIENT_KEY, CLIENT_SECRET_KEY, CONSENT_KEY, PROFILE_KEY].forEach((key) => localStorage.removeItem(key));
+      } catch {
+        // The visible state is still reset for this page session.
+      }
+      state.consent = false;
+      state.profile = { schoolId: state.config?.id || "demo-school", gradeBand: "lower", playerStyle: "balanced" };
+      setChoiceButtons("gradeBandButtons", state.profile.gradeBand);
+      setChoiceButtons("playerStyleButtons", state.profile.playerStyle);
+      abandonSession();
+      setPrivacyCopy();
+      setConnectionStatus(state.online, STATIC_HOST ? "GitHub 离线试玩，不上传数据" : "研究数据已清除");
+    });
+    setPrivacyCopy();
   }
 
   function setChoiceButtons(containerId, value) {
@@ -173,6 +257,7 @@
     if (requestedSchool) state.profile.schoolId = requestedSchool;
     bindProfileButtons("gradeBandButtons", "gradeBand");
     bindProfileButtons("playerStyleButtons", "playerStyle");
+    bindPrivacyControls();
     const select = document.getElementById("schoolSelect");
     if (STATIC_HOST) {
       state.online = false;
@@ -180,6 +265,7 @@
       applyConfig(config);
       renderSchoolOption(select, config.id, config.name);
       setConnectionStatus(false, "GitHub 离线试玩，不上传数据");
+      setPrivacyCopy();
       bindFeedbackForm();
       window.addEventListener("schooltopia-language-change", () => {
         applyConfig(config);
@@ -190,9 +276,13 @@
     try {
       state.schools = await api("/schools");
       if (select) {
-        select.innerHTML = state.schools
-          .map((school) => `<option value="${school.id}">${localizedText(school.name)}</option>`)
-          .join("");
+        select.innerHTML = "";
+        state.schools.forEach((school) => {
+          const option = document.createElement("option");
+          option.value = school.id;
+          option.textContent = localizedText(school.name);
+          select.append(option);
+        });
         if (!state.schools.some((school) => school.id === state.profile.schoolId)) {
           state.profile.schoolId = state.schools[0]?.id || "demo-school";
         }
@@ -204,7 +294,7 @@
         });
       }
       await loadConfig(state.profile.schoolId);
-      setConnectionStatus(true);
+      setConnectionStatus(true, state.consent ? "匿名研究已启用" : "匿名研究未启用");
     } catch (error) {
       setConnectionStatus(false, "后台未启动，当前为离线试玩");
       renderSchoolOption(select, "demo-school", "离线示例学校");
@@ -240,11 +330,14 @@
   function startSession(currentGame) {
     state.sessionId = null;
     state.choiceQueue = Promise.resolve();
-    if (!state.online) return Promise.resolve(null);
+    if (!state.online || !state.consent) return Promise.resolve(null);
+    const client = getClientIdentity();
     state.sessionPromise = api("/sessions/start", {
       method: "POST",
       body: JSON.stringify({
-        clientId: getClientId(),
+        clientId: client.id,
+        deletionKey: client.deletionKey,
+        researchConsent: true,
         schoolId: state.profile.schoolId,
         route: currentGame.route,
         identity: currentGame.identity,
@@ -298,7 +391,12 @@
 
   async function endSession(currentGame, endingId, endingTitle) {
     const id = await sessionId();
-    if (!id) return;
+    if (!id) {
+      const insight = document.getElementById("sessionInsight");
+      if (insight) insight.textContent = localSessionSummary(currentGame, endingTitle);
+      document.getElementById("feedbackPanel")?.classList.add("hidden");
+      return;
+    }
     await state.choiceQueue;
     const insight = document.getElementById("sessionInsight");
     if (insight) insight.textContent = "正在生成本局研究摘要...";
@@ -323,6 +421,24 @@
     } catch {
       if (insight) insight.textContent = "本局已结束，但研究摘要暂时无法连接后台。";
     }
+  }
+
+  function localSessionSummary(currentGame, endingTitle) {
+    const stats = snapshot(currentGame);
+    const labels = currentGame?.route === "teacher"
+      ? { authority: "教学威严", teacherStamina: "教师体能", teacherMood: "教师心情", studentFavor: "学生好感", gradeTrust: "年级组信任" }
+      : { wisdom: "智慧", stamina: "体能", mood: "心情", peerFavor: "同学好感", homeroomTrust: "班主任信任" };
+    const ranked = Object.entries(stats)
+      .filter(([key, value]) => labels[key] && Number.isFinite(Number(value)))
+      .sort((a, b) => Number(a[1]) - Number(b[1]));
+    const pressure = ranked[0] ? labels[ranked[0][0]] : "状态";
+    const resource = ranked.at(-1) ? labels[ranked.at(-1)[0]] : "选择";
+    const grade = state.profile.gradeBand === "upper" ? "高年级" : "低年级";
+    const style = { academic: "学术型", social: "社交型", balanced: "平衡型" }[state.profile.playerStyle] || "平衡型";
+    if (window.SchooltopiaI18n?.language === "en") {
+      return `Local run summary for a ${localizedText(grade)} / ${localizedText(style)} profile: ${localizedText(pressure)} was the main pressure point, while ${localizedText(resource)} was your strongest resource. You reached ${localizedText(endingTitle)}. This summary stays in this browser.`;
+    }
+    return `本机回顾（${grade} / ${style}）：${pressure}是本局最明显的压力点，${resource}是最主要的生存资源。最终到达${endingTitle}。本摘要只保存在当前浏览器。`;
   }
 
   function abandonSession() {
@@ -396,9 +512,12 @@
       (event) => event.enabled && (event.route === "both" || event.route === currentGame.route)
     );
     if (!events.length) return null;
-    const event = events[Math.floor(Math.random() * events.length)];
-    const chance = Number(event.chance || 0) * getEventMultiplier();
-    if (!helpers.randomChance(chance)) return null;
+    const triggeredEvents = events.filter((event) => {
+      const chance = Number(event.chance || 0) * getEventMultiplier();
+      return helpers.randomChance(chance);
+    });
+    if (!triggeredEvents.length) return null;
+    const event = triggeredEvents[Math.floor(Math.random() * triggeredEvents.length)];
     const teacherStat = {
       wisdom: "authority",
       stamina: "teacherStamina",
@@ -406,23 +525,33 @@
       peerFavor: "studentFavor",
       homeroomTrust: "gradeTrust",
     };
+    const language = window.SchooltopiaI18n?.language === "en" ? "en" : "zh";
+    const translation = event.translations?.[language];
+    const translatedOptions = translation?.options || [];
+    const eventTitle = translation?.title || localizedText(event.title);
+    const eventDescription = translation?.description || localizedText(event.description);
     return helpers.makeEvent({
       id: event.id,
-      name: event.title,
+      name: eventTitle,
       type: `${state.config.name} · 校本事件`,
-      description: event.description,
-      options: event.options.map((option) => ({
-        id: `${event.id}_${option.id}`,
-        name: option.label,
-        detail: option.detail,
-        run() {
-          option.effects.forEach(({ stat, delta }) => {
-            const resolvedStat = currentGame.route === "teacher" ? teacherStat[stat] || stat : stat;
-            helpers.applyStatChange(currentGame.route, resolvedStat, Number(delta), `${event.category}_${event.id}`);
-          });
-          helpers.addLog(`校本事件“${event.title}”：你选择了“${option.label}”。`);
-        },
-      })),
+      description: eventDescription,
+      options: event.options.map((option, index) => {
+        const translated = translatedOptions.find((item) => item.id === option.id) || translatedOptions[index];
+        const optionLabel = translated?.label || localizedText(option.label);
+        const optionDetail = translated?.detail || localizedText(option.detail);
+        return {
+          id: `${event.id}_${option.id}`,
+          name: optionLabel,
+          detail: optionDetail,
+          run() {
+            option.effects.forEach(({ stat, delta }) => {
+              const resolvedStat = currentGame.route === "teacher" ? teacherStat[stat] || stat : stat;
+              helpers.applyStatChange(currentGame.route, resolvedStat, Number(delta), `${event.category}_${event.id}`);
+            });
+            helpers.addLog(`校本事件“${eventTitle}”：你选择了“${optionLabel}”。`);
+          },
+        };
+      }),
     });
   }
 

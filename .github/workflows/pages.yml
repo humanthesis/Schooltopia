@@ -25,11 +25,14 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Run tests
+        run: node test.js
+
       - name: Prepare public site
         run: |
           mkdir -p _site/vendor
-          cp index.html styles.css i18n.js schooltopia.js game.js _site/
-          cp creator.html admin.css creator.css creator.js creator-audio.js _site/
+          cp index.html styles.css i18n.js shared-config.js schooltopia.js game.js _site/
+          cp creator.html admin.css creator.css creator.js creator-audio.js event-generator.js _site/
           cp creator-3d-loader.js creator-3d.bundle.js _site/
           cp share-cover.png share-cover.svg .nojekyll _site/
           cp vendor/three.core.min.js vendor/three.module.min.js _site/vendor/

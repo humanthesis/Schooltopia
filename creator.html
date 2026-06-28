@@ -7,8 +7,8 @@
     <title>Schooltopia Studio · 创建我的学校</title>
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23142522'/%3E%3Cpath d='M13 45h38v6H13zM18 24h28v21H18z' fill='%23d09a39'/%3E%3Cpath d='M12 19h40v7H12z' fill='%23245f61'/%3E%3C/svg%3E" />
     <link rel="stylesheet" href="admin.css?v=20260626-2" />
-    <link rel="stylesheet" href="creator.css?v=20260626-2" />
-    <link rel="preload" href="creator-3d.bundle.js" as="script" />
+    <link rel="stylesheet" href="creator.css?v=20260628-2" />
+    <link rel="preload" href="creator-3d.bundle.js?v=20260628-2" as="script" />
   </head>
   <body>
     <header class="admin-topbar creator-topbar">
@@ -26,13 +26,13 @@
       <div class="creator-top-actions">
         <button id="creatorLanguageToggle" class="creator-audio-button language-toggle" type="button" data-lang-toggle>English</button>
         <div class="creator-audio-controls" aria-label="声音设置">
-          <button id="creatorMusicToggle" class="creator-audio-button" type="button" aria-pressed="true" title="背景音乐：Gymnopédie No.1">
+        <button id="creatorMusicToggle" class="creator-audio-button" type="button" aria-pressed="false" title="背景音乐：Gymnopédie No.1">
             <span class="creator-music-mark" aria-hidden="true"></span>
-            <span id="creatorMusicLabel">音乐 开</span>
+          <span id="creatorMusicLabel">音乐 关</span>
           </button>
-          <button id="creatorSoundToggle" class="creator-audio-button" type="button" aria-pressed="true" title="创建器音效">
+        <button id="creatorSoundToggle" class="creator-audio-button" type="button" aria-pressed="false" title="创建器音效">
             <span class="creator-sound-mark" aria-hidden="true"></span>
-            <span id="creatorSoundLabel">音效 开</span>
+          <span id="creatorSoundLabel">音效 关</span>
           </button>
         </div>
       </div>
@@ -54,21 +54,24 @@
         <div class="hero-blueprint-grid" aria-hidden="true"></div>
         <div class="hero-copy">
           <p class="hero-kicker">SCHOOLTOPIA / CAMPUS STUDIO</p>
-          <h1 id="creatorHeroTitle">搭建你的<br />校园世界</h1>
-          <p>换一套校园模型、写入真实事件，再重新定义这所学校的生存规则。</p>
+          <h1 id="creatorHeroTitle">创建你的<br />校园版本</h1>
+          <p>选择校园配色、写入真实事件，再重新定义这所学校的生存规则。</p>
           <a href="#schoolDockTitle" class="hero-start-link">开始创建</a>
         </div>
         <div class="hero-scene-meta" aria-hidden="true">
-          <span>MODEL 01</span>
-          <strong>LIVE CAMPUS</strong>
-          <small>12 WEEK SIMULATION</small>
+          <span>CONFIG 01</span>
+          <strong>LIVE PREVIEW</strong>
+          <small>12 WEEK RULESET</small>
         </div>
         <div class="hero-axis" aria-hidden="true"><i></i><i></i><i></i></div>
       </section>
 
       <div class="admin-shell creator-shell">
 
-      <p id="creatorStatus" class="status-line creator-status" aria-live="polite"></p>
+      <div id="creatorStatus" class="status-line creator-status" role="status" aria-live="polite">
+        <span id="creatorStatusText"></span>
+        <button id="dismissCreatorStatus" type="button" aria-label="关闭系统提示" title="关闭">×</button>
+      </div>
 
       <section class="school-dock" aria-labelledby="schoolDockTitle">
         <div class="dock-heading">
@@ -117,8 +120,8 @@
           <section id="appearancePanel" class="editor-section">
             <div class="section-head">
               <div>
-                <p class="section-kicker">Identity &amp; Theme</p>
-                <h2>学校信息与皮肤</h2>
+                <p class="section-kicker">身份与主题</p>
+                <h2>学校信息与配色</h2>
               </div>
               <button id="saveCreatorConfig" class="primary-button" type="button">保存全部设置</button>
             </div>
@@ -129,18 +132,18 @@
             </div>
 
             <div class="theme-heading">
-              <h3>主题预设</h3>
-              <p>先选一套完整风格，也可以继续微调四种颜色。</p>
+              <h3>配色预设</h3>
+              <p>先选一套校园配色，也可以继续微调四种颜色。</p>
             </div>
             <div id="skinPresetGrid" class="skin-preset-grid"></div>
 
             <details class="custom-colors">
               <summary>自定义颜色</summary>
               <div class="color-grid">
-                <label>主色 <input id="creatorPrimary" type="color" value="#245f61" /></label>
-                <label>强调色 <input id="creatorAccent" type="color" value="#d09a39" /></label>
-                <label>风险色 <input id="creatorDanger" type="color" value="#b64d3f" /></label>
-                <label>天空色 <input id="creatorSky" type="color" value="#10242b" /></label>
+                <label>主色 <span class="color-control"><input id="creatorPrimary" type="color" value="#245f61" /><input id="creatorPrimaryHex" class="color-hex" value="#245f61" maxlength="7" aria-label="主色十六进制值" /></span></label>
+                <label>强调色 <span class="color-control"><input id="creatorAccent" type="color" value="#d09a39" /><input id="creatorAccentHex" class="color-hex" value="#d09a39" maxlength="7" aria-label="强调色十六进制值" /></span></label>
+                <label>风险色 <span class="color-control"><input id="creatorDanger" type="color" value="#b64d3f" /><input id="creatorDangerHex" class="color-hex" value="#b64d3f" maxlength="7" aria-label="风险色十六进制值" /></span></label>
+                <label>天空色 <span class="color-control"><input id="creatorSky" type="color" value="#10242b" /><input id="creatorSkyHex" class="color-hex" value="#10242b" maxlength="7" aria-label="天空色十六进制值" /></span></label>
               </div>
             </details>
           </section>
@@ -148,7 +151,7 @@
           <section id="rulesPanel" class="editor-section">
             <div class="section-head compact">
               <div>
-                <p class="section-kicker">Rule Mixer</p>
+                <p class="section-kicker">规则调节</p>
                 <h2>规则权重</h2>
                 <p>1.00 是原版节奏；数值越高，对应机制越强。</p>
               </div>
@@ -159,9 +162,9 @@
           <section id="eventsPanel" class="editor-section events-section">
             <div class="section-head">
               <div>
-                <p class="section-kicker">Story Generator</p>
-                <h2>真实事件转剧情节点</h2>
-                <p>输入真实校园事件生成三个初稿，再逐项修改选项、说明与属性变化。</p>
+                <p class="section-kicker">剧情草稿生成器</p>
+                <h2>真实事件转剧情草稿</h2>
+                <p>根据事件关键词、路线和压力类型生成三条草稿，再逐项修改文本与属性变化。每条事件独立判定触发率，同一时点最多出现一条。</p>
               </div>
             </div>
             <div class="event-composer">
@@ -176,7 +179,7 @@
                     <option value="both">学生与教师</option>
                   </select>
                 </label>
-                <button id="creatorGenerateEvent" class="primary-button" type="button">自动生成剧情节点</button>
+                <button id="creatorGenerateEvent" class="primary-button" type="button">生成三条剧情草稿</button>
               </div>
             </div>
             <div class="table-wrap creator-event-table">
@@ -199,9 +202,9 @@
 
           <section id="sharePanel" class="editor-section share-section">
             <div>
-              <p class="section-kicker">Publish</p>
+              <p class="section-kicker">发布</p>
               <h2>进入游戏并分享</h2>
-              <p>专属链接会载入当前学校的皮肤、事件和变量权重。</p>
+              <p>专属链接内含当前学校的配色、事件和变量权重；接收者无需本机存档。</p>
             </div>
             <div class="share-link-row">
               <input id="schoolShareLink" readonly aria-label="学校专属游戏链接" />
@@ -213,7 +216,7 @@
 
         <aside class="preview-column" aria-label="学校实时预览">
           <div class="preview-heading">
-            <span>LIVE PREVIEW</span>
+            <span>实时预览</span>
             <i aria-hidden="true"></i>
           </div>
           <div id="creatorSkinPreview" class="campus-preview">
@@ -265,9 +268,11 @@
       </form>
     </dialog>
 
-    <script src="i18n.js?v=20260626-1"></script>
-    <script src="creator-3d-loader.js"></script>
-    <script src="creator-audio.js"></script>
-    <script src="creator.js?v=20260626-1"></script>
+  <script src="i18n.js?v=20260628-2"></script>
+  <script src="shared-config.js?v=20260628-2"></script>
+  <script src="event-generator.js?v=20260628-2"></script>
+  <script src="creator-3d-loader.js?v=20260628-2"></script>
+  <script src="creator-audio.js?v=20260628-2"></script>
+  <script src="creator.js?v=20260628-2"></script>
   </body>
 </html>

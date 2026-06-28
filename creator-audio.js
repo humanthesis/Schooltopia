@@ -18,9 +18,9 @@
 
   function readPreference(key) {
     try {
-      return localStorage.getItem(key) !== "false";
+      return localStorage.getItem(key) === "true";
     } catch {
-      return true;
+      return false;
     }
   }
 

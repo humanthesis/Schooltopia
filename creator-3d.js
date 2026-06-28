@@ -6,11 +6,11 @@ const hero = document.getElementById("creatorHero");
 if (canvas && hero) {
   try {
   const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)");
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "high-performance" });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: "default" });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, window.innerWidth < 700 ? 1.25 : 1.5));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color("#dfe9e2");
@@ -183,6 +183,7 @@ if (canvas && hero) {
   let pointerY = 0;
   let frame = 0;
   let lastTime = 0;
+  let heroVisible = true;
 
   function updateTheme(colors = {}) {
     Object.keys(palette).forEach((key) => {
@@ -220,6 +221,7 @@ if (canvas && hero) {
   }
 
   function animate(time = 0) {
+    frame = 0;
     const seconds = time * 0.001;
     const delta = Math.min(0.05, (time - lastTime) * 0.001 || 0);
     lastTime = time;
@@ -235,7 +237,7 @@ if (canvas && hero) {
       });
     }
     renderer.render(scene, camera);
-    if (!document.hidden) frame = requestAnimationFrame(animate);
+    if (!document.hidden && heroVisible) frame = requestAnimationFrame(animate);
   }
 
   hero.addEventListener("pointermove", (event) => {
@@ -252,10 +254,22 @@ if (canvas && hero) {
     if (document.hidden) {
       cancelAnimationFrame(frame);
       frame = 0;
-    } else if (!frame) {
+    } else if (heroVisible && !frame) {
       frame = requestAnimationFrame(animate);
     }
   });
+  if ("IntersectionObserver" in window) {
+    new IntersectionObserver(([entry]) => {
+      heroVisible = entry.isIntersecting;
+      if (!heroVisible && frame) {
+        cancelAnimationFrame(frame);
+        frame = 0;
+      } else if (heroVisible && !document.hidden && !frame) {
+        lastTime = performance.now();
+        frame = requestAnimationFrame(animate);
+      }
+    }, { rootMargin: "120px 0px" }).observe(hero);
+  }
   new ResizeObserver(resize).observe(hero);
 
   window.Creator3D = { setTheme: updateTheme };

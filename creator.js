@@ -2,6 +2,7 @@
   const API = "/api";
   const OWNED_KEY = "schooltopia_owned_schools_v2";
   const STATIC_SCHOOL_KEY = "schooltopia_static_school_v1";
+  const STATIC_SCHOOLS_KEY = "schooltopia_static_schools_v2";
   const STATIC_HOST =
     window.location.hostname.endsWith(".github.io") ||
     new URLSearchParams(window.location.search).has("static");
@@ -52,6 +53,9 @@
     school: null,
     token: "",
     editingEventId: "",
+    dirty: false,
+    draftTimer: 0,
+    statusTimer: 0,
   };
 
   function $(id) {
@@ -87,30 +91,66 @@
     return JSON.parse(JSON.stringify(value));
   }
 
-  function readStaticSchool() {
+  function normalizeStaticSchool(school) {
+    const normalized = window.SchooltopiaShare?.normalizeConfig?.(school) || school;
+    return {
+      ...normalized,
+      id: school.id || normalized.id,
+      createdAt: school.createdAt,
+      updatedAt: school.updatedAt,
+    };
+  }
+
+  function readStaticSchools() {
     try {
-      const stored = JSON.parse(localStorage.getItem(STATIC_SCHOOL_KEY) || "null");
-      if (!stored) return clone(DEFAULT_STATIC_SCHOOL);
-      return {
+      const stored = JSON.parse(localStorage.getItem(STATIC_SCHOOLS_KEY) || "[]");
+      if (Array.isArray(stored) && stored.length) return stored.map(normalizeStaticSchool);
+      const legacy = JSON.parse(localStorage.getItem(STATIC_SCHOOL_KEY) || "null");
+      if (!legacy) return [];
+      const migrated = normalizeStaticSchool({
         ...clone(DEFAULT_STATIC_SCHOOL),
-        ...stored,
-        skin: { ...DEFAULT_STATIC_SCHOOL.skin, ...(stored.skin || {}) },
-        weights: { ...DEFAULT_STATIC_SCHOOL.weights, ...(stored.weights || {}) },
-        customEvents: Array.isArray(stored.customEvents) ? stored.customEvents : [],
-      };
+        ...legacy,
+        id: legacy.id && legacy.id !== "local-school" ? legacy.id : makeStaticSchoolId(legacy.name),
+      });
+      localStorage.setItem(STATIC_SCHOOLS_KEY, JSON.stringify([migrated]));
+      localStorage.setItem(STATIC_SCHOOL_KEY, JSON.stringify(migrated));
+      return [migrated];
     } catch {
-      return clone(DEFAULT_STATIC_SCHOOL);
+      return [];
     }
   }
 
+  function makeStaticSchoolId(name) {
+    const slug = String(name || "school")
+      .toLowerCase()
+      .normalize("NFKD")
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 36) || "school";
+    return `${slug}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  }
+
+  function readStaticSchool(id) {
+    const schools = readStaticSchools();
+    if (!schools.length) return null;
+    return schools.find((school) => school.id === id) || schools[0];
+  }
+
   function saveStaticSchool(school) {
-    state.school = school;
+    const normalized = normalizeStaticSchool(school);
+    state.school = normalized;
     try {
-      localStorage.setItem(STATIC_SCHOOL_KEY, JSON.stringify(school));
+      const schools = readStaticSchools();
+      const index = schools.findIndex((item) => item.id === normalized.id);
+      if (index >= 0) schools[index] = normalized;
+      else schools.push(normalized);
+      localStorage.setItem(STATIC_SCHOOLS_KEY, JSON.stringify(schools));
+      localStorage.setItem(STATIC_SCHOOL_KEY, JSON.stringify(normalized));
+      state.owned = schools.map(staticOwnedEntry);
     } catch {
       setStatus("浏览器无法保存学校设置，请保持本页面打开。", true);
     }
-    return school;
+    return normalized;
   }
 
   function staticOwnedEntry(school) {
@@ -119,6 +159,27 @@
 
   function localizedText(value) {
     return window.SchooltopiaI18n?.phrase?.(String(value ?? "")) ?? String(value ?? "");
+  }
+
+  function currentLanguage() {
+    return window.SchooltopiaI18n?.language === "en" ? "en" : "zh";
+  }
+
+  function eventView(event, language = currentLanguage()) {
+    const translation = event.translations?.[language];
+    const translatedOptions = translation?.options || [];
+    return {
+      title: translation?.title || localizedText(event.title),
+      description: translation?.description || localizedText(event.description || ""),
+      options: (event.options || []).map((option, index) => {
+        const translated = translatedOptions.find((item) => item.id === option.id) || translatedOptions[index];
+        return {
+          ...option,
+          label: translated?.label || localizedText(option.label),
+          detail: translated?.detail || localizedText(option.detail || ""),
+        };
+      }),
+    };
   }
 
   function localizeKnownInput(input) {
@@ -177,9 +238,38 @@
   }
 
   function setStatus(message, error = false) {
-    $("creatorStatus").textContent = message;
+    window.clearTimeout(state.statusTimer);
+    $("creatorStatusText").textContent = message;
+    $("creatorStatus").classList.toggle("has-message", Boolean(message));
     $("creatorStatus").classList.toggle("error", error);
+    if (message && !error) state.statusTimer = window.setTimeout(() => setStatus(""), 5500);
     window.dispatchEvent(new CustomEvent("creator-status", { detail: { message, error } }));
+  }
+
+  function clampNumber(value, min, max, fallback) {
+    const number = Number(value);
+    return Math.max(min, Math.min(max, Number.isFinite(number) ? number : fallback));
+  }
+
+  function setDirty(dirty) {
+    state.dirty = dirty;
+    const button = $("saveCreatorConfig");
+    if (!button) return;
+    button.classList.toggle("has-unsaved-changes", dirty);
+    button.textContent = dirty ? localizedText("保存修改") : localizedText("保存全部设置");
+  }
+
+  function scheduleStaticDraftSave() {
+    if (!STATIC_HOST || !state.school) return;
+    window.clearTimeout(state.draftTimer);
+    state.draftTimer = window.setTimeout(() => {
+      persistDraft().catch((error) => setStatus(error.message, true));
+    }, 350);
+  }
+
+  function markConfigDirty() {
+    setDirty(true);
+    scheduleStaticDraftSave();
   }
 
   function renderOwned() {
@@ -197,20 +287,22 @@
     const button = $("createOwnedSchool");
     button.disabled = true;
     try {
+      await persistDraft();
       if (STATIC_HOST) {
         const school = saveStaticSchool({
           ...clone(DEFAULT_STATIC_SCHOOL),
+          id: makeStaticSchoolId(name),
           name,
+          createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         });
-        state.owned = [staticOwnedEntry(school)];
         renderOwned();
         $("ownedSchoolSelect").value = school.id;
         state.token = "local";
         renderWorkspace();
         $("creatorWorkspace").classList.remove("hidden");
         $("creatorSchoolName").value = "";
-        setStatus(`已创建“${school.name}”。现在可以选择皮肤并添加校园事件。`);
+        setStatus(`已创建“${school.name}”。现在可以选择配色并添加校园事件。`);
         return;
       }
       state.token = "";
@@ -227,7 +319,7 @@
       state.token = owned.token;
       await loadSchool(owned.id);
       $("creatorSchoolName").value = "";
-      setStatus(`已创建“${school.name}”。现在可以选择皮肤并添加校园事件。`);
+      setStatus(`已创建“${school.name}”。现在可以选择配色并添加校园事件。`);
     } catch (error) {
       setStatus(error.message, true);
     } finally {
@@ -236,6 +328,7 @@
   }
 
   async function loadOwnedSchool() {
+    await persistDraft();
     const id = $("ownedSchoolSelect").value;
     const owned = state.owned.find((item) => item.id === id);
     if (!owned) return;
@@ -245,8 +338,10 @@
 
   async function loadSchool(id) {
     if (STATIC_HOST) {
-      state.school = readStaticSchool();
-      state.owned = [staticOwnedEntry(state.school)];
+      state.school = readStaticSchool(id);
+      if (!state.school) return;
+      state.owned = readStaticSchools().map(staticOwnedEntry);
+      localStorage.setItem(STATIC_SCHOOL_KEY, JSON.stringify(state.school));
       renderOwned();
       $("ownedSchoolSelect").value = state.school.id;
       renderWorkspace();
@@ -281,6 +376,9 @@
     $("creatorAccent").value = school.skin.accent;
     $("creatorDanger").value = school.skin.danger;
     $("creatorSky").value = school.skin.sky;
+    ["creatorPrimary", "creatorAccent", "creatorDanger", "creatorSky"].forEach((id) => {
+      $(`${id}Hex`).value = $(id).value.toUpperCase();
+    });
     $("creatorPreviewName").textContent = localizedText(school.name);
     $("creatorPreviewTagline").textContent = localizedText(school.tagline || "每所学校都有自己的生存规则。");
     $("railSchoolName").textContent = localizedText(school.name);
@@ -290,6 +388,7 @@
     renderWeights();
     renderEvents();
     renderShareLink();
+    setDirty(false);
   }
 
   function currentSkin() {
@@ -343,8 +442,12 @@
     $("creatorAccent").value = preset.accent;
     $("creatorDanger").value = preset.danger;
     $("creatorSky").value = preset.sky;
+    ["creatorPrimary", "creatorAccent", "creatorDanger", "creatorSky"].forEach((colorId) => {
+      $(`${colorId}Hex`).value = $(colorId).value.toUpperCase();
+    });
     renderSkinPreview();
-    setStatus(`已选择“${preset.name}”主题，保存后会应用到专属游戏。`);
+    markConfigDirty();
+    setStatus(`已选择“${preset.name}”配色，保存后会应用到专属游戏。`);
   }
 
   function colorWithAlpha(hex, alpha) {
@@ -426,18 +529,60 @@
     `).join("");
     weightMeta.forEach(([id]) => {
       $(`creator-weight-${id}`).addEventListener("input", () => {
-        $(`creator-output-${id}`).textContent = Number($(`creator-weight-${id}`).value).toFixed(2);
+        const input = $(`creator-weight-${id}`);
+        const value = clampNumber(input.value, 0.6, 1.4, 1);
+        $(`creator-output-${id}`).textContent = value.toFixed(2);
+        markConfigDirty();
+      });
+      $(`creator-weight-${id}`).addEventListener("change", () => {
+        const input = $(`creator-weight-${id}`);
+        input.value = clampNumber(input.value, 0.6, 1.4, 1).toFixed(2);
       });
     });
   }
 
   function configPayload() {
+    const weights = Object.fromEntries(weightMeta.map(([id]) => {
+      const input = $(`creator-weight-${id}`);
+      const value = clampNumber(input.value, 0.6, 1.4, state.school?.weights?.[id] || 1);
+      input.value = value.toFixed(2);
+      $(`creator-output-${id}`).textContent = value.toFixed(2);
+      return [id, value];
+    }));
     return {
       name: $("creatorNameInput").value,
       tagline: $("creatorTaglineInput").value,
       skin: currentSkin(),
-      weights: Object.fromEntries(weightMeta.map(([id]) => [id, Number($(`creator-weight-${id}`).value)])),
+      weights,
     };
+  }
+
+  async function persistDraft() {
+    window.clearTimeout(state.draftTimer);
+    if (!state.school || !state.dirty) return state.school;
+    if (STATIC_HOST) {
+      const school = saveStaticSchool({
+        ...state.school,
+        ...configPayload(),
+        updatedAt: new Date().toISOString(),
+      });
+      renderOwned();
+      $("ownedSchoolSelect").value = school.id;
+      renderShareLink();
+      setDirty(false);
+      return school;
+    }
+    state.school = await api(`/schools/${state.school.id}`, {
+      method: "PUT",
+      body: JSON.stringify(configPayload()),
+    });
+    const owned = state.owned.find((item) => item.id === state.school.id);
+    if (owned) owned.name = state.school.name;
+    saveOwned();
+    renderOwned();
+    $("ownedSchoolSelect").value = state.school.id;
+    setDirty(false);
+    return state.school;
   }
 
   async function saveConfig() {
@@ -449,7 +594,6 @@
           version: Number(state.school.version || 1) + 1,
           updatedAt: new Date().toISOString(),
         });
-        state.owned = [staticOwnedEntry(school)];
         renderOwned();
         $("ownedSchoolSelect").value = school.id;
         renderWorkspace();
@@ -482,10 +626,11 @@
       if (STATIC_HOST) {
         const school = saveStaticSchool({
           ...clone(DEFAULT_STATIC_SCHOOL),
+          id: state.school.id,
+          createdAt: state.school.createdAt,
           version: Number(state.school.version || 1) + 1,
           updatedAt: new Date().toISOString(),
         });
-        state.owned = [staticOwnedEntry(school)];
         renderOwned();
         $("ownedSchoolSelect").value = school.id;
         renderWorkspace();
@@ -523,52 +668,15 @@
     const button = $("creatorGenerateEvent");
     button.disabled = true;
     try {
+      await persistDraft();
       if (STATIC_HOST) {
-        const english = window.SchooltopiaI18n?.language === "en";
-        const title = prompt.replace(/[。！？!?\n].*$/, "").slice(0, 18) || "校园新事件";
-        const event = {
-          id: `school_event_${Date.now().toString(36)}`,
-          title,
-          category: "campus",
-          route: $("creatorEventRoute").value,
-          description: prompt,
-          chance: 22,
-          enabled: true,
-          generated: true,
-          options: [
-            {
-              id: "face_it",
-              label: english ? "Face It" : "正面处理",
-              detail: english
-                ? "Address the problem directly for a stronger result, with a possible cost."
-                : "直接解决问题，收益更明显，也可能付出代价。",
-              effects: [{ stat: "wisdom", delta: 2 }, { stat: "mood", delta: -1 }],
-            },
-            {
-              id: "seek_support",
-              label: english ? "Seek Support" : "找人合作",
-              detail: english
-                ? "Use your support network to soften the pressure."
-                : "借助关系网络缓冲压力。",
-              effects: [{ stat: "peerFavor", delta: 2 }, { stat: "homeroomTrust", delta: 1 }],
-            },
-            {
-              id: "protect_self",
-              label: english ? "Protect Yourself" : "先保护状态",
-              detail: english
-                ? "Reduce the immediate strain, though the problem will not fully disappear."
-                : "减少眼前损耗，但问题不会完全消失。",
-              effects: [{ stat: "stamina", delta: 2 }, { stat: "mood", delta: 1 }],
-            },
-          ],
-          createdAt: new Date().toISOString(),
-        };
+        const event = window.SchooltopiaEventGenerator.generateEventDraft(prompt, $("creatorEventRoute").value);
         state.school.customEvents.push(event);
         state.school.version = Number(state.school.version || 1) + 1;
         saveStaticSchool(state.school);
         $("creatorEventPrompt").value = "";
         renderWorkspace();
-        setStatus(`已把“${event.title}”生成三个可玩的剧情节点。`);
+        setStatus(`已根据“${eventView(event).title}”生成三条剧情草稿。`);
         return;
       }
       const event = await api(`/schools/${state.school.id}/events/generate`, {
@@ -577,7 +685,7 @@
       });
       $("creatorEventPrompt").value = "";
       await loadSchool(state.school.id);
-      setStatus(`已把“${event.title}”生成三个可玩的剧情节点。`);
+      setStatus(`已根据“${eventView(event).title}”生成三条剧情草稿。`);
     } catch (error) {
       setStatus(error.message, true);
     } finally {
@@ -591,14 +699,16 @@
     tbody.innerHTML = "";
     $("creatorEventEmpty").classList.toggle("hidden", events.length > 0);
     events.forEach((event) => {
+      const view = eventView(event);
       const row = document.createElement("tr");
+      row.dataset.eventId = event.id;
       row.innerHTML = `
-        <td><input class="event-title-input" value="${escapeHtml(event.title)}" maxlength="60" /></td>
-        <td><select class="route-select"><option value="student" ${event.route === "student" ? "selected" : ""}>学生</option><option value="teacher" ${event.route === "teacher" ? "selected" : ""}>教师</option><option value="both" ${event.route === "both" ? "selected" : ""}>双路线</option></select></td>
-        <td><input class="chance-input" type="number" min="1" max="100" value="${event.chance}" />%</td>
-        <td class="node-summary"><span>${event.options.map((option) => escapeHtml(option.label)).join(" / ")}</span><button class="edit-nodes" type="button">编辑节点</button></td>
-        <td><input class="enabled-input" type="checkbox" ${event.enabled ? "checked" : ""} aria-label="启用 ${escapeHtml(event.title)}" /></td>
-        <td><div class="row-actions"><button class="save-event" type="button">保存</button><button class="delete-event danger-button" type="button">删除</button></div></td>
+        <td data-label="事件名称"><input class="event-title-input" value="${escapeHtml(view.title)}" maxlength="60" aria-label="${escapeHtml(view.title)} · 事件名称" /></td>
+        <td data-label="路线"><select class="route-select" aria-label="${escapeHtml(view.title)} · 路线"><option value="student" ${event.route === "student" ? "selected" : ""}>学生</option><option value="teacher" ${event.route === "teacher" ? "selected" : ""}>教师</option><option value="both" ${event.route === "both" ? "selected" : ""}>双路线</option></select></td>
+        <td data-label="触发率"><span class="chance-control"><input class="chance-input" aria-label="${escapeHtml(view.title)} · 触发率" type="number" min="1" max="100" value="${clampNumber(event.chance, 1, 100, 25)}" /><span aria-hidden="true">%</span></span></td>
+        <td data-label="剧情节点" class="node-summary"><span>${view.options.map((option) => escapeHtml(option.label)).join(" / ")}</span><button class="edit-nodes" type="button">编辑节点</button></td>
+        <td data-label="启用"><input class="enabled-input" type="checkbox" ${event.enabled ? "checked" : ""} aria-label="启用 ${escapeHtml(view.title)}" /></td>
+        <td data-label="操作"><div class="row-actions"><button class="save-event" type="button">保存</button><button class="delete-event danger-button" type="button">删除</button></div></td>
       `;
       row.querySelector(".save-event").addEventListener("click", () => saveEvent(row, event.id));
       row.querySelector(".edit-nodes").addEventListener("click", () => openNodeEditor(event));
@@ -613,35 +723,42 @@
     return `${stat.student} / ${stat.teacher}`;
   }
 
-  function renderEffectRow(container, effect, route) {
+  function renderEffectRow(container, effect, route, optionIndex, effectIndex) {
     const row = document.createElement("div");
     row.className = "node-effect-row";
+    const optionNumber = optionIndex + 1;
+    const effectNumber = effectIndex + 1;
+    const initialDelta = clampNumber(effect.delta, -5, 5, 1);
     row.innerHTML = `
-      <select class="node-effect-stat" aria-label="影响属性">
+      <select class="node-effect-stat" aria-label="节点 ${optionNumber} · 影响属性 ${effectNumber}">
         ${eventStatMeta.map((stat) => `<option value="${stat.id}" ${stat.id === effect.stat ? "selected" : ""}>${statOptionLabel(stat, route)}</option>`).join("")}
       </select>
-      <input class="node-effect-delta" type="number" min="-5" max="5" step="1" value="${Number(effect.delta) || 1}" aria-label="属性变化数值" />
-      <output class="node-effect-preview">${Number(effect.delta) > 0 ? "+" : ""}${Number(effect.delta) || 1}</output>
-      <button class="remove-node-effect" type="button" aria-label="移除这项属性变化" title="移除">×</button>
+      <input class="node-effect-delta" type="number" min="-5" max="5" step="1" value="${initialDelta}" aria-label="节点 ${optionNumber} · 属性变化 ${effectNumber}" />
+      <output class="node-effect-preview">${initialDelta > 0 ? "+" : ""}${initialDelta}</output>
+      <button class="remove-node-effect" type="button" aria-label="移除节点 ${optionNumber} 的属性变化 ${effectNumber}" title="移除">×</button>
     `;
     const deltaInput = row.querySelector(".node-effect-delta");
     const preview = row.querySelector(".node-effect-preview");
     deltaInput.addEventListener("input", () => {
-      const value = Number(deltaInput.value) || 0;
+      const value = clampNumber(deltaInput.value, -5, 5, 0);
       preview.textContent = `${value > 0 ? "+" : ""}${value}`;
       preview.classList.toggle("negative", value < 0);
     });
-    preview.classList.toggle("negative", Number(effect.delta) < 0);
+    deltaInput.addEventListener("change", () => {
+      deltaInput.value = String(clampNumber(deltaInput.value, -5, 5, 1));
+    });
+    preview.classList.toggle("negative", initialDelta < 0);
     row.querySelector(".remove-node-effect").addEventListener("click", () => {
       row.remove();
-      if (!container.children.length) renderEffectRow(container, { stat: "mood", delta: 1 }, route);
+      if (!container.children.length) renderEffectRow(container, { stat: "mood", delta: 1 }, route, optionIndex, 0);
     });
     container.append(row);
   }
 
   function renderNodeEditor(event) {
     const route = event.route || "student";
-    const options = Array.from({ length: 3 }, (_, index) => event.options[index] || {
+    const view = eventView(event);
+    const options = Array.from({ length: 3 }, (_, index) => view.options[index] || {
       id: `choice_${index + 1}`,
       label: `选择 ${index + 1}`,
       detail: "",
@@ -656,21 +773,21 @@
       card.innerHTML = `
         <header><span>NODE ${String(index + 1).padStart(2, "0")}</span><strong>玩家选择 ${index + 1}</strong></header>
         <div class="node-copy-fields">
-          <label>选项名称<input class="node-option-label" maxlength="60" value="${escapeHtml(localizedText(option.label))}" /></label>
-          <label>选项说明<textarea class="node-option-detail" rows="2" maxlength="180">${escapeHtml(localizedText(option.detail))}</textarea></label>
+          <label>选项名称<input class="node-option-label" maxlength="60" value="${escapeHtml(option.label)}" aria-label="节点 ${index + 1} · 选项名称" /></label>
+          <label>选项说明<textarea class="node-option-detail" rows="2" maxlength="180" aria-label="节点 ${index + 1} · 选项说明">${escapeHtml(option.detail)}</textarea></label>
         </div>
         <div class="node-effects-head"><strong>选择后的属性变化</strong><button class="add-node-effect" type="button">＋ 添加变化</button></div>
         <div class="node-effect-list"></div>
       `;
       const effects = option.effects?.length ? option.effects : [{ stat: "mood", delta: 1 }];
       const effectList = card.querySelector(".node-effect-list");
-      effects.forEach((effect) => renderEffectRow(effectList, effect, route));
+      effects.forEach((effect, effectIndex) => renderEffectRow(effectList, effect, route, index, effectIndex));
       card.querySelector(".add-node-effect").addEventListener("click", () => {
         if (effectList.children.length >= 4) {
           setStatus("每个节点最多设置四项属性变化。", true);
           return;
         }
-        renderEffectRow(effectList, { stat: "mood", delta: 1 }, route);
+        renderEffectRow(effectList, { stat: "mood", delta: 1 }, route, index, effectList.children.length);
       });
       list.append(card);
     });
@@ -678,8 +795,9 @@
 
   function openNodeEditor(event) {
     state.editingEventId = event.id;
-    $("nodeEditorEventName").textContent = `正在编辑：${event.title}`;
-    $("nodeEditorDescription").value = event.description || "";
+    const view = eventView(event);
+    $("nodeEditorEventName").textContent = `正在编辑：${view.title}`;
+    $("nodeEditorDescription").value = view.description;
     renderNodeEditor(event);
     $("nodeEditorDialog").showModal();
   }
@@ -696,9 +814,37 @@
       detail: card.querySelector(".node-option-detail").value,
       effects: Array.from(card.querySelectorAll(".node-effect-row")).map((row) => ({
         stat: row.querySelector(".node-effect-stat").value,
-        delta: Number(row.querySelector(".node-effect-delta").value),
+        delta: clampNumber(row.querySelector(".node-effect-delta").value, -5, 5, 1),
       })),
     }));
+  }
+
+  function applyLocalizedEventEdits(event, edits) {
+    const language = currentLanguage();
+    event.sourceLanguage ||= language;
+    event.translations ||= {};
+    const previousTranslation = event.translations[language] || {};
+    const nextOptions = edits.options || eventView(event, language).options;
+    event.translations[language] = {
+      title: edits.title ?? previousTranslation.title ?? event.title,
+      description: edits.description ?? previousTranslation.description ?? event.description,
+      options: nextOptions.map((option) => ({ id: option.id, label: option.label, detail: option.detail })),
+    };
+    event.options = nextOptions.map((option, index) => {
+      const current = event.options[index] || {};
+      return {
+        ...current,
+        id: option.id || current.id || `choice_${index + 1}`,
+        label: language === event.sourceLanguage ? option.label : current.label,
+        detail: language === event.sourceLanguage ? option.detail : current.detail,
+        effects: option.effects || current.effects || [{ stat: "mood", delta: 1 }],
+      };
+    });
+    if (language === event.sourceLanguage) {
+      if (edits.title !== undefined) event.title = edits.title;
+      if (edits.description !== undefined) event.description = edits.description;
+    }
+    return event;
   }
 
   async function saveNodeEditor(event) {
@@ -717,8 +863,10 @@
       if (STATIC_HOST) {
         const item = state.school.customEvents.find((entry) => entry.id === state.editingEventId);
         if (item) {
-          item.description = $("nodeEditorDescription").value;
-          item.options = options;
+          applyLocalizedEventEdits(item, {
+            description: $("nodeEditorDescription").value,
+            options,
+          });
           item.updatedAt = new Date().toISOString();
           state.school.version = Number(state.school.version || 1) + 1;
           saveStaticSchool(state.school);
@@ -728,11 +876,18 @@
         setStatus("剧情节点已更新，新的选项与属性变化会直接进入游戏。");
         return;
       }
+      const item = state.school.customEvents.find((entry) => entry.id === state.editingEventId);
+      const updated = applyLocalizedEventEdits(clone(item), {
+        description: $("nodeEditorDescription").value,
+        options,
+      });
       await api(`/schools/${state.school.id}/events/${state.editingEventId}`, {
         method: "PUT",
         body: JSON.stringify({
-          description: $("nodeEditorDescription").value,
-          options,
+          description: updated.description,
+          options: updated.options,
+          sourceLanguage: updated.sourceLanguage,
+          translations: updated.translations,
         }),
       });
       closeNodeEditor();
@@ -750,9 +905,10 @@
       if (STATIC_HOST) {
         const item = state.school.customEvents.find((event) => event.id === eventId);
         if (item) {
-          item.title = row.querySelector(".event-title-input").value;
+          applyLocalizedEventEdits(item, { title: row.querySelector(".event-title-input").value });
           item.route = row.querySelector(".route-select").value;
-          item.chance = Number(row.querySelector(".chance-input").value);
+          item.chance = clampNumber(row.querySelector(".chance-input").value, 1, 100, 22);
+          row.querySelector(".chance-input").value = String(item.chance);
           item.enabled = row.querySelector(".enabled-input").checked;
           item.updatedAt = new Date().toISOString();
           state.school.version = Number(state.school.version || 1) + 1;
@@ -762,13 +918,17 @@
         setStatus("事件设置已保存。");
         return;
       }
+      const item = state.school.customEvents.find((event) => event.id === eventId);
+      const updated = applyLocalizedEventEdits(clone(item), { title: row.querySelector(".event-title-input").value });
       await api(`/schools/${state.school.id}/events/${eventId}`, {
         method: "PUT",
         body: JSON.stringify({
-          title: row.querySelector(".event-title-input").value,
+          title: updated.title,
           route: row.querySelector(".route-select").value,
-          chance: Number(row.querySelector(".chance-input").value),
+          chance: clampNumber(row.querySelector(".chance-input").value, 1, 100, 22),
           enabled: row.querySelector(".enabled-input").checked,
+          sourceLanguage: updated.sourceLanguage,
+          translations: updated.translations,
         }),
       });
       await loadSchool(state.school.id);
@@ -798,18 +958,17 @@
   }
 
   function renderShareLink() {
-    const origin = publicShareOrigin();
-    const link = `${origin}/?school=${encodeURIComponent(state.school.id)}`;
-    $("schoolShareLink").value = link;
-    $("playOwnedSchool").href = link;
-  }
-
-  function publicShareOrigin() {
-    const url = new URL(window.location.href);
-    if (["127.0.0.1", "localhost"].includes(url.hostname) && url.port === "4180") {
-      url.port = "4181";
+    try {
+      const link = window.SchooltopiaShare.buildShareUrl(window.location.href, state.school);
+      $("schoolShareLink").value = link;
+      $("playOwnedSchool").href = link;
+      $("copySchoolLink").disabled = false;
+    } catch (error) {
+      $("schoolShareLink").value = "";
+      $("playOwnedSchool").removeAttribute("href");
+      $("copySchoolLink").disabled = true;
+      setStatus(error.message, true);
     }
-    return url.origin;
   }
 
   async function copyLink() {
@@ -828,36 +987,73 @@
     $("saveCreatorConfig").addEventListener("click", saveConfig);
     $("creatorGenerateEvent").addEventListener("click", generateEvent);
     $("copySchoolLink").addEventListener("click", copyLink);
+    $("dismissCreatorStatus").addEventListener("click", () => setStatus(""));
     $("resetOwnedSchool").addEventListener("click", resetSchool);
     $("nodeEditorForm").addEventListener("submit", saveNodeEditor);
     $("closeNodeEditor").addEventListener("click", closeNodeEditor);
     $("cancelNodeEditor").addEventListener("click", closeNodeEditor);
-    ["creatorPrimary", "creatorAccent", "creatorDanger", "creatorSky"].forEach((id) => $(id).addEventListener("input", renderSkinPreview));
+    ["creatorPrimary", "creatorAccent", "creatorDanger", "creatorSky"].forEach((id) => {
+      const colorInput = $(id);
+      const hexInput = $(`${id}Hex`);
+      colorInput.addEventListener("input", () => {
+        hexInput.value = colorInput.value.toUpperCase();
+        renderSkinPreview();
+        markConfigDirty();
+      });
+      const applyHex = () => {
+        const value = hexInput.value.trim();
+        if (/^#[0-9a-fA-F]{6}$/.test(value)) {
+          colorInput.value = value;
+          hexInput.value = value.toUpperCase();
+          renderSkinPreview();
+          markConfigDirty();
+        } else {
+          hexInput.value = colorInput.value.toUpperCase();
+          setStatus("颜色值需要使用 #RRGGBB 格式。", true);
+        }
+      };
+      hexInput.addEventListener("change", applyHex);
+      hexInput.addEventListener("blur", applyHex);
+    });
     $("creatorNameInput").addEventListener("input", () => {
       const name = $("creatorNameInput").value || "Schooltopia";
       $("creatorPreviewName").textContent = name;
       $("railSchoolName").textContent = name;
+      markConfigDirty();
     });
     $("creatorTaglineInput").addEventListener("input", () => {
       $("creatorPreviewTagline").textContent = $("creatorTaglineInput").value || "每所学校都有自己的生存规则。";
+      markConfigDirty();
     });
     window.addEventListener("schooltopia-language-change", () => {
       renderOwned();
       localizeCreatorInputs();
+      if (state.school) renderEvents();
+      setDirty(state.dirty);
+    });
+    window.addEventListener("beforeunload", (event) => {
+      if (!state.dirty || STATIC_HOST) return;
+      event.preventDefault();
+      event.returnValue = "";
     });
   }
 
   async function init() {
     bind();
     if (STATIC_HOST) {
-      state.school = readStaticSchool();
-      state.owned = [staticOwnedEntry(state.school)];
+      const schools = readStaticSchools();
+      state.owned = schools.map(staticOwnedEntry);
+      state.school = schools[0] || null;
       state.token = "local";
       renderOwned();
-      $("ownedSchoolSelect").value = state.school.id;
-      renderWorkspace();
-      $("creatorWorkspace").classList.remove("hidden");
-      setStatus("GitHub 版使用当前浏览器保存学校设置，六套皮肤和自定义事件均可直接试玩。");
+      if (state.school) {
+        $("ownedSchoolSelect").value = state.school.id;
+        renderWorkspace();
+        $("creatorWorkspace").classList.remove("hidden");
+      } else {
+        $("creatorWorkspace").classList.add("hidden");
+      }
+      setStatus("GitHub 版使用当前浏览器保存学校设置，六套配色和自定义事件均可直接试玩。");
       return;
     }
     try {
