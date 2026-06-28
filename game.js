@@ -756,6 +756,7 @@ let lastStatSoundAt = 0;
 
 const SAVE_SLOT_COUNT = 3;
 const SAVE_STORAGE_PREFIX = "schooltopia_game_save_slot_";
+const INHERITED_MEMORY_KEY = "schooltopia_inherited_memory_v1";
 const SAVE_PHASES = new Set(["daily", "daily_skip", "lunch"]);
 
 const dom = {
@@ -767,6 +768,9 @@ const dom = {
   identityButtons: document.getElementById("identityButtons"),
   difficultyButtons: document.getElementById("difficultyButtons"),
   difficultyLabel: document.getElementById("difficultyLabel"),
+  inheritedMemoryBanner: document.getElementById("inheritedMemoryBanner"),
+  inheritedMemoryName: document.getElementById("inheritedMemoryName"),
+  clearInheritedMemory: document.getElementById("clearInheritedMemory"),
   pointsLeft: document.getElementById("pointsLeft"),
   attributeSetup: document.getElementById("attributeSetup"),
   recommendedSetup: document.getElementById("recommendedSetup"),
@@ -816,6 +820,12 @@ const dom = {
   eventOptions: document.getElementById("eventOptions"),
   endingTitle: document.getElementById("endingTitle"),
   endingText: document.getElementById("endingText"),
+  endingScore: document.getElementById("endingScore"),
+  endingRarity: document.getElementById("endingRarity"),
+  endingVerdict: document.getElementById("endingVerdict"),
+  endingChronicle: document.getElementById("endingChronicle"),
+  memoryOptions: document.getElementById("memoryOptions"),
+  memoryStatus: document.getElementById("memoryStatus"),
   restartGame: document.getElementById("restartGame"),
   restartInGame: document.getElementById("restartInGame"),
   systemLine: document.getElementById("systemLine"),
@@ -1278,6 +1288,9 @@ function loadMetaSave() {
       unlockedEvents: readStoredSet("schooltopia_unlocked_events"),
       unlockedEndings: readStoredSet("schooltopia_unlocked_endings"),
       unlockedAchievements: readStoredSet("schooltopia_unlocked_achievements"),
+      inheritedMemory: window.SchooltopiaRunRecap?.normalizeMemory?.(
+        JSON.parse(localStorage.getItem(INHERITED_MEMORY_KEY) || "null")
+      ) || null,
     };
   } catch {
     return {
@@ -1285,6 +1298,7 @@ function loadMetaSave() {
       unlockedEvents: new Set(),
       unlockedEndings: new Set(),
       unlockedAchievements: new Set(),
+      inheritedMemory: null,
     };
   }
 }
@@ -1295,6 +1309,7 @@ function cloneMetaSave(save) {
     unlockedEvents: new Set(save.unlockedEvents || []),
     unlockedEndings: new Set(save.unlockedEndings || []),
     unlockedAchievements: new Set(save.unlockedAchievements || []),
+    inheritedMemory: window.SchooltopiaRunRecap?.normalizeMemory?.(save.inheritedMemory) || null,
   };
 }
 
@@ -1306,6 +1321,8 @@ function saveMetaSave() {
     localStorage.setItem("schooltopia_unlocked_events", JSON.stringify([...save.unlockedEvents]));
     localStorage.setItem("schooltopia_unlocked_endings", JSON.stringify([...save.unlockedEndings]));
     localStorage.setItem("schooltopia_unlocked_achievements", JSON.stringify([...save.unlockedAchievements]));
+    if (save.inheritedMemory) localStorage.setItem(INHERITED_MEMORY_KEY, JSON.stringify(save.inheritedMemory));
+    else localStorage.removeItem(INHERITED_MEMORY_KEY);
     metaSave = cloneMetaSave(save);
   } catch {
     if (game) addLog("本地记录暂时无法保存，但本局游戏可以继续。");
@@ -1366,6 +1383,8 @@ function serializeGameForSave() {
     recentChanges: [...game.recentChanges],
     recentChangedStats: serializeSet(game.recentChangedStats),
     aiHabit: { ...game.aiHabit },
+    chronicle: window.SchooltopiaRunRecap?.normalizeChronicle?.(game.chronicle) || [],
+    inheritedMemory: window.SchooltopiaRunRecap?.normalizeMemory?.(game.inheritedMemory) || null,
     log: [...game.log],
     counters: { ...game.counters },
     classState: { ...game.classState },
@@ -1416,6 +1435,8 @@ function reviveGameFromSave(save) {
   restored.recentChanges = Array.isArray(state.recentChanges) ? state.recentChanges.slice(0, 8) : [];
   restored.recentChangedStats = reviveSet(state.recentChangedStats);
   restored.aiHabit = { ...restored.aiHabit, ...(state.aiHabit || {}) };
+  restored.chronicle = window.SchooltopiaRunRecap?.normalizeChronicle?.(state.chronicle) || [];
+  restored.inheritedMemory = window.SchooltopiaRunRecap?.normalizeMemory?.(state.inheritedMemory) || null;
   restored.log = Array.isArray(state.log) ? state.log.slice(0, 120) : [];
   restored.counters = { ...restored.counters, ...(state.counters || {}) };
   restored.classState = { ...restored.classState, ...(state.classState || {}) };
@@ -1443,7 +1464,7 @@ function saveSlotSummary(save) {
   const routeName = state.route === "teacher" ? "教师路线" : "学生路线";
   const difficultyName = difficultyConfig(state.difficulty).name;
   const phaseName =
-    state.currentActionPhase === "lunch" ? "校园行动第二轮" : state.currentActionPhase === "daily_skip" ? "第一轮已跳过" : "校园行动第一轮";
+    state.currentActionPhase === "lunch" ? "校园活动第二轮" : state.currentActionPhase === "daily_skip" ? "日常行动已跳过" : "日常行动第一轮";
   return `${routeName} · 第 ${state.week || 1} 周 · ${phaseName} · ${difficultyName}`;
 }
 
@@ -1529,10 +1550,9 @@ function renderSavedActionPhase() {
     return;
   }
   if (game.currentActionPhase === "daily_skip") {
-    const activity = getCurrentCampusActivity();
-    dom.phaseLabel.textContent = "校园行动 · 第一轮";
-    dom.roundState.textContent = activity.title;
-    renderContinueAction(`第一轮 · ${activity.title}`, "状态不足，本轮跳过", "进入第二轮", chooseLunchAction);
+    dom.phaseLabel.textContent = "第一轮 · 日常行动";
+    dom.roundState.textContent = "日常行动已跳过";
+    renderContinueAction("第一轮 · 日常行动", "状态不足，日常行动跳过", "进入校园活动", chooseLunchAction);
     return;
   }
   chooseDailyAction();
@@ -1592,7 +1612,7 @@ function renderInGameSaveControls() {
 
 function createGameState() {
   const difficulty = difficultyConfig(setup.difficulty);
-  return {
+  const state = {
     week: 1,
     route: setup.route,
     identity: setup.identity,
@@ -1619,6 +1639,8 @@ function createGameState() {
       dependency: 0,
       risk: 0,
     },
+    chronicle: [],
+    inheritedMemory: null,
     log: [],
     counters: {
       absenceDays: 0,
@@ -1688,6 +1710,13 @@ function createGameState() {
     futureDailyActionSkippedWeeks: 0,
     projectScoreModifier: 0,
   };
+  const inheritedMemory = window.SchooltopiaRunRecap?.normalizeMemory?.(metaSave.inheritedMemory);
+  const inheritedStat = window.SchooltopiaRunRecap?.memoryStatForRoute?.(inheritedMemory, state.route);
+  if (inheritedMemory && inheritedStat && Object.hasOwn(state.stats, inheritedStat)) {
+    state.stats[inheritedStat] = clamp(state.stats[inheritedStat] + 1, 0, 10);
+    state.inheritedMemory = inheritedMemory;
+  }
+  return state;
 }
 
 function assertStudentRoute() {
@@ -2081,6 +2110,25 @@ function applyRecommendedSetup() {
   renderSetup();
 }
 
+function memoryTargetForSetup() {
+  const memory = window.SchooltopiaRunRecap?.normalizeMemory?.(metaSave.inheritedMemory);
+  const stat = window.SchooltopiaRunRecap?.memoryStatForRoute?.(memory, setup.route);
+  const attribute = ATTRIBUTES[setup.route].find((item) => item.id === stat);
+  return memory && attribute ? { memory, stat, label: attribute.name } : null;
+}
+
+function renderInheritedMemoryBanner() {
+  const target = memoryTargetForSetup();
+  dom.inheritedMemoryBanner.classList.toggle("hidden", !target);
+  if (target) dom.inheritedMemoryName.textContent = target.label;
+}
+
+function clearInheritedMemory() {
+  metaSave.inheritedMemory = null;
+  saveMetaSave();
+  renderInheritedMemoryBanner();
+}
+
 function renderSetup() {
   dom.routeButtons.innerHTML = "";
   ROUTES.forEach((route) => {
@@ -2135,12 +2183,18 @@ function renderSetup() {
   dom.pointsLeft.textContent = `剩余 ${setup.points} 点`;
   dom.startGame.disabled = setup.points !== 0;
   dom.startGame.textContent = setup.points === 0 ? "开始游戏" : `还需分配 ${setup.points} 点`;
+  renderInheritedMemoryBanner();
   renderSaveSlots();
 }
 
 function startGame() {
   playSound("action");
   game = createGameState();
+  const inheritedStat = window.SchooltopiaRunRecap?.memoryStatForRoute?.(game.inheritedMemory, game.route);
+  if (game.inheritedMemory) {
+    game.metaSave.inheritedMemory = null;
+    saveMetaSave();
+  }
   window.Schooltopia?.startSession?.(game);
   document.body.classList.add("game-active");
   refreshDynamicStatuses();
@@ -2150,6 +2204,7 @@ function startGame() {
   dom.gameView.classList.remove("hidden");
   dom.eventModal.classList.add("hidden");
   addLog(TEXT.systemLine);
+  if (inheritedStat) addLog(`上局记忆生效：${statLabel(inheritedStat)} +1。`);
   renderAll();
   enterWeek();
 }
@@ -2497,10 +2552,36 @@ function renderActionEffects(effects, effectText = "") {
   return items ? `<span class="action-effects"><b>属性变化</b>${items}</span>` : "";
 }
 
+function recordChronicleEntry(kind, title, choice) {
+  if (!game || !window.SchooltopiaRunRecap?.recordEntry) return;
+  game.chronicle = window.SchooltopiaRunRecap.recordEntry(game.chronicle, {
+    week: game.week,
+    kind,
+    title,
+    choice,
+  });
+}
+
+function recordActionChronicle(action) {
+  if (!game) return;
+  if (game.currentActionPhase === "lunch" && action.activityAction) {
+    recordChronicleEntry("activity", action.contextLabel || "校园活动", action.name);
+    return;
+  }
+  if (["daily", "daily_skip"].includes(game.currentActionPhase)) {
+    const choice = game.currentActionPhase === "daily_skip" ? "日常行动跳过" : action.name;
+    recordChronicleEntry("daily", "日常行动", choice);
+  }
+}
+
 function renderActions(title, subtitle, actions) {
   dom.actionTitle.textContent = title;
   dom.actionSubtitle.textContent = subtitle;
   dom.actionList.innerHTML = "";
+  dom.actionList.closest(".action-panel")?.classList.toggle(
+    "activity-round",
+    actions.length > 0 && actions.every((action) => action.activityAction)
+  );
   actions.forEach((action, index) => {
     const button = document.createElement("button");
     button.type = "button";
@@ -2512,7 +2593,7 @@ function renderActions(title, subtitle, actions) {
     }
     button.innerHTML = `
       <span class="action-key">${key}</span>
-      <span class="action-copy"><strong>${action.name}</strong><span>${action.detail || ""}</span>${renderActionEffects(action.effects, action.effectText)}</span>
+      <span class="action-copy">${action.contextLabel ? `<span class="action-context">${action.contextLabel}</span>` : ""}<strong>${action.name}</strong><span>${action.detail || ""}</span>${renderActionEffects(action.effects, action.effectText)}</span>
     `;
     button.addEventListener("click", () => {
       if (button.disabled) return;
@@ -2521,6 +2602,8 @@ function renderActions(title, subtitle, actions) {
       const researchWeek = game?.week || 0;
       const researchPhase = game?.currentActionPhase || "";
       clearRecentChanges();
+      resetInactiveNormalActionStreaks(action);
+      recordActionChronicle(action);
       action.run();
       window.Schooltopia?.recordChoice?.(
         {
@@ -2609,12 +2692,6 @@ function selectRotatingCoreActions(actions) {
   return Array.from({ length: count }, (_, offset) => actions[(start + offset) % actions.length]);
 }
 
-function resetActionStreaksForCampusChoice(phase, actionId) {
-  if (game.route === "student" && phase === "first") updateStudentDailyActionStreaks(actionId);
-  if (game.route === "student" && phase === "second") updateStudentLunchActionStreaks(actionId);
-  if (game.route === "teacher" && phase === "first") updateTeacherDailyActionStreaks(actionId);
-}
-
 function makeCampusActivityActions(phase) {
   const activity = getCurrentCampusActivity();
   const effectPhase = phase === "first" ? "first" : "second";
@@ -2627,12 +2704,12 @@ function makeCampusActivityActions(phase) {
     return {
       id: actionId,
       name,
-      detail: style.detail,
+      detail: `${activity[`${effectPhase}Detail`] || activity.brief} ${style.detail}`,
       effects,
       featured: false,
       activityAction: true,
+      contextLabel: activity.title,
       run() {
-        resetActionStreaksForCampusChoice(phase, actionId);
         applyEffects(game.route, effects, actionId);
         game.counters.campusActivityChoices += 1;
         addLog(`${activity.title}：${name}。`);
@@ -2642,24 +2719,37 @@ function makeCampusActivityActions(phase) {
   });
 }
 
-function mixActivityAndCoreActions(activityActions, coreActions) {
-  return activityActions.flatMap((activityAction, index) => [activityAction, coreActions[index]].filter(Boolean));
+function buildNormalActionChoices(classActions, breakActions) {
+  const classChoices = selectRotatingCoreActions(classActions).map((action) => ({
+    ...action,
+    normalCategory: "class",
+    contextLabel: "上课 / 课间",
+  }));
+  const breakChoices = selectRotatingCoreActions(breakActions).map((action) => ({
+    ...action,
+    normalCategory: "break",
+    contextLabel: "午休 / 课后",
+  }));
+  const count = Math.max(classChoices.length, breakChoices.length);
+  return Array.from({ length: count }, (_, index) => [classChoices[index], breakChoices[index]])
+    .flat()
+    .filter(Boolean);
 }
 
 function getStudentDailyActions() {
-  return mixActivityAndCoreActions(makeCampusActivityActions("first"), selectRotatingCoreActions(getAllStudentDailyActions()));
+  return buildNormalActionChoices(getAllStudentDailyActions(), getAllStudentLunchActions());
 }
 
 function getTeacherDailyActions() {
-  return mixActivityAndCoreActions(makeCampusActivityActions("first"), selectRotatingCoreActions(getAllTeacherDailyActions()));
+  return buildNormalActionChoices(getAllTeacherDailyActions(), getAllTeacherLunchActions());
 }
 
 function getStudentLunchActions() {
-  return mixActivityAndCoreActions(makeCampusActivityActions("second"), selectRotatingCoreActions(getAllStudentLunchActions()));
+  return makeCampusActivityActions("second");
 }
 
 function getTeacherLunchActions() {
-  return mixActivityAndCoreActions(makeCampusActivityActions("second"), selectRotatingCoreActions(getAllTeacherLunchActions()));
+  return makeCampusActivityActions("second");
 }
 
 function runNormalWeek() {
@@ -2736,44 +2826,45 @@ function triggerPreActionRareEnvironmentEventIfNeeded() {
 function chooseDailyAction() {
   if (game.gameEnded) return;
   game.currentActionPhase = "daily";
-  const activity = getCurrentCampusActivity();
-  dom.phaseLabel.textContent = "校园行动 · 第一轮";
-  dom.roundState.textContent = activity.title;
+  dom.phaseLabel.textContent = "第一轮 · 日常行动";
+  dom.roundState.textContent = "正常上课与课间";
   if (game.temp.shouldSkipDailyActionThisWeek) {
     game.currentActionPhase = "daily_skip";
     game.temp.shouldSkipDailyActionThisWeek = false;
+    resetAllNormalActionStreaks();
     addLog("本周因体能耗尽或特殊事件跳过日常行动。");
-    renderContinueAction(`第一轮 · ${activity.title}`, "状态不足，本轮跳过", "进入第二轮", chooseLunchAction);
+    renderContinueAction("第一轮 · 日常行动", "状态不足，日常行动跳过", "进入校园活动", chooseLunchAction);
     return;
   }
   const actions = game.route === "student" ? getStudentDailyActions() : getTeacherDailyActions();
-  renderActions(`第一轮 · ${activity.title}`, `先准备：选一种做法`, actions);
+  renderActions("第一轮 · 日常行动", "上课、课间或午休：选择一项日常行动", actions);
 }
 
-function finishDailyAction() {
+function advanceAfterActionSelection() {
   if (game.gameEnded) return;
   checkThresholdRewards();
   checkImmediateEndings();
   if (game.gameEnded) return;
-  chooseLunchAction();
+  if (game.currentActionPhase === "lunch") runPostLunchChecks();
+  else chooseLunchAction();
+}
+
+function finishDailyAction() {
+  advanceAfterActionSelection();
 }
 
 function chooseLunchAction() {
   if (game.gameEnded) return;
   game.currentActionPhase = "lunch";
   const activity = getCurrentCampusActivity();
-  dom.phaseLabel.textContent = "校园行动 · 第二轮";
+  dom.phaseLabel.textContent = "第二轮 · 校园活动";
   dom.roundState.textContent = activity.title;
   const actions = game.route === "student" ? getStudentLunchActions() : getTeacherLunchActions();
-  renderActions(`第二轮 · ${activity.title}`, "到现场：选一种处理方式", actions);
+  renderActions(`第二轮 · ${activity.title}`, `本轮只出现“${activity.title}”的专属选项。`, actions);
 }
 
 function finishLunchAction() {
-  if (game.gameEnded) return;
-  checkThresholdRewards();
-  checkImmediateEndings();
-  if (game.gameEnded) return;
-  runPostLunchChecks();
+  advanceAfterActionSelection();
 }
 
 function runPostLunchChecks() {
@@ -2861,6 +2952,38 @@ function updateStudentDailyActionStreaks(actionId) {
     game.temp.currentWeekChoseDailyPhysicalAction = true;
   } else {
     game.counters.sportsActionStreak = 0;
+  }
+}
+
+function resetAllNormalActionStreaks() {
+  if (game.route === "student") {
+    game.counters.dailyStudyStreak = 0;
+    game.counters.sportsActionStreak = 0;
+    game.counters.lunchSoloStudyStreak = 0;
+    game.counters.chatWithTeacherLunchStreak = 0;
+    return;
+  }
+  game.counters.dragClassStreak = 0;
+  game.counters.surpriseCheckStreak = 0;
+  game.counters.teacherBadmintonStreak = 0;
+}
+
+function resetInactiveNormalActionStreaks(action) {
+  if (!game || game.currentActionPhase !== "daily" || action.activityAction) return;
+  if (game.route === "student") {
+    if (action.normalCategory === "break") {
+      game.counters.dailyStudyStreak = 0;
+      game.counters.sportsActionStreak = 0;
+    } else if (action.normalCategory === "class") {
+      game.counters.lunchSoloStudyStreak = 0;
+      game.counters.chatWithTeacherLunchStreak = 0;
+    }
+    return;
+  }
+  if (action.normalCategory === "break") {
+    game.counters.dragClassStreak = 0;
+    game.counters.surpriseCheckStreak = 0;
+    game.counters.teacherBadmintonStreak = 0;
   }
 }
 
@@ -3460,6 +3583,7 @@ function openEvent(event, onDone) {
       const researchWeek = game?.week || 0;
       const researchPhase = game?.currentActionPhase || "event";
       clearRecentChanges();
+      recordChronicleEntry("event", event.name, option.name);
       option.run?.();
       window.Schooltopia?.recordChoice?.(
         {
@@ -4837,6 +4961,118 @@ function getEndingPresentation(endingId) {
   return ending;
 }
 
+const ENDING_RARITY_LABELS = {
+  common: "普通",
+  uncommon: "少见",
+  rare: "罕见",
+  legendary: "传奇",
+};
+
+const ENDING_VERDICTS = {
+  mythic: "你没有活过校园，是校园勉强活过了你。",
+  exceptional: "教务系统决定把你标记为异常样本。",
+  survivor: "你活下来了，代价被系统礼貌地隐藏。",
+  accident: "这不是失败，是一份很有个人风格的事故报告。",
+  story: "数值不高，但故事已经足够让下一届害怕。",
+};
+
+function appendChronicleLine(container, kind, text) {
+  const line = document.createElement("div");
+  line.className = "chronicle-line";
+  const label = document.createElement("span");
+  label.className = "chronicle-kind";
+  label.textContent = kind;
+  const copy = document.createElement("strong");
+  copy.textContent = text;
+  line.append(label, copy);
+  container.append(line);
+}
+
+function renderEndingChronicle() {
+  const weeks = window.SchooltopiaRunRecap?.buildChronicle?.(game.chronicle) || [];
+  dom.endingChronicle.innerHTML = "";
+  if (!weeks.length) {
+    const item = document.createElement("li");
+    const week = document.createElement("span");
+    week.className = "chronicle-week";
+    week.textContent = `第 ${game.week} 周`;
+    const lines = document.createElement("div");
+    lines.className = "chronicle-lines";
+    appendChronicleLine(lines, "命运", "还没来得及选择，结局先到了。");
+    item.append(week, lines);
+    dom.endingChronicle.append(item);
+    return;
+  }
+  weeks.forEach((entry) => {
+    const item = document.createElement("li");
+    const week = document.createElement("span");
+    week.className = "chronicle-week";
+    week.textContent = `第 ${entry.week} 周`;
+    const lines = document.createElement("div");
+    lines.className = "chronicle-lines";
+    if (entry.daily) appendChronicleLine(lines, "日常", entry.daily.choice);
+    if (entry.activity) appendChronicleLine(lines, "活动", `${entry.activity.title} · ${entry.activity.choice}`);
+    entry.events.forEach((event) => appendChronicleLine(lines, "事件", `${event.title} · ${event.choice}`));
+    item.append(week, lines);
+    dom.endingChronicle.append(item);
+  });
+}
+
+function chooseInheritedMemory(candidate, endingId, endingTitle) {
+  game.metaSave.inheritedMemory = {
+    slot: candidate.slot,
+    endingId,
+    endingTitle,
+  };
+  saveMetaSave();
+  renderMemoryOptions(endingId, endingTitle);
+  dom.memoryStatus.textContent = "这段记忆已保存。重新开始后生效。";
+  dom.restartGame.textContent = "带着记忆重新开始";
+  playSound("save");
+}
+
+function renderMemoryOptions(endingId, endingTitle) {
+  const candidates = window.SchooltopiaRunRecap?.getMemoryCandidates?.(game.stats, game.route) || [];
+  const selectedSlot = game.metaSave.inheritedMemory?.slot || "";
+  dom.memoryOptions.innerHTML = "";
+  candidates.forEach((candidate) => {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `memory-option${candidate.slot === selectedSlot ? " selected" : ""}`;
+    button.setAttribute("aria-pressed", candidate.slot === selectedSlot ? "true" : "false");
+    const label = statLabel(candidate.stat);
+    const meta = document.createElement("small");
+    meta.textContent = `本局 ${candidate.value}/10`;
+    const title = document.createElement("strong");
+    title.textContent = label;
+    const effect = document.createElement("span");
+    effect.textContent = "下一局 +1";
+    button.append(meta, title, effect);
+    button.addEventListener("click", () => chooseInheritedMemory(candidate, endingId, endingTitle));
+    dom.memoryOptions.append(button);
+  });
+}
+
+function renderRunRecap(endingId, endingTitle) {
+  const report = window.SchooltopiaRunRecap?.calculateRunReport?.({
+    stats: game.stats,
+    week: game.week,
+    difficulty: game.difficulty,
+    achievements: game.achievements,
+    titles: game.titles,
+    endingId,
+    chronicle: game.chronicle,
+  }) || { score: 0, rarityId: "common", verdictId: "story" };
+  dom.endingScore.textContent = String(report.score);
+  dom.endingRarity.textContent = ENDING_RARITY_LABELS[report.rarityId] || ENDING_RARITY_LABELS.common;
+  dom.endingRarity.dataset.rarity = report.rarityId;
+  dom.endingVerdict.textContent = ENDING_VERDICTS[report.verdictId] || ENDING_VERDICTS.story;
+  dom.memoryStatus.textContent = "";
+  dom.restartGame.textContent = "重新开始";
+  renderEndingChronicle();
+  renderMemoryOptions(endingId, endingTitle);
+}
+
 function triggerEnding(endingId) {
   if (!game || game.gameEnded) return;
   const ending = getEndingPresentation(endingId);
@@ -4858,6 +5094,7 @@ function triggerEnding(endingId) {
   prompt.className = "final-prompt";
   prompt.textContent = TEXT.finalPrompt;
   dom.endingText.append(prompt);
+  renderRunRecap(endingId, ending.title);
   window.Schooltopia?.endSession?.(game, endingId, ending.title);
   renderAll();
 }
@@ -5237,6 +5474,7 @@ document.addEventListener("visibilitychange", () => {
 });
 dom.startGame.addEventListener("click", startGame);
 dom.recommendedSetup.addEventListener("click", applyRecommendedSetup);
+dom.clearInheritedMemory.addEventListener("click", clearInheritedMemory);
 dom.restartGame.addEventListener("click", resetGame);
 dom.restartInGame.addEventListener("click", confirmRestartInGame);
 dom.openCodexSetup.addEventListener("click", () => openCodex("events"));

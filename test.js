@@ -20,6 +20,14 @@ const {
   readShareUrl,
 } = require("./shared-config");
 const { generateEventDraft } = require("./event-generator");
+const {
+  buildChronicle,
+  calculateRunReport,
+  getMemoryCandidates,
+  memoryStatForRoute,
+  normalizeMemory,
+  recordEntry,
+} = require("./run-recap");
 
 const sharedSource = {
   id: "nanshan-school",
@@ -77,15 +85,65 @@ const serverSharedUrl = buildShareUrl("http://127.0.0.1:4180/creator.html?static
 assert.ok(serverSharedUrl.startsWith("http://127.0.0.1:4180/index.html?static=1#"));
 
 const gameSource = fs.readFileSync("game.js", "utf8");
+const i18nSource = fs.readFileSync("i18n.js", "utf8");
 assert.ok(gameSource.includes("name.textContent = option.name"));
 assert.ok(!gameSource.includes("game.metaSave.totalAiCopyCount"));
+assert.ok(gameSource.includes("return buildNormalActionChoices(getAllStudentDailyActions(), getAllStudentLunchActions())"));
+assert.ok(gameSource.includes('return makeCampusActivityActions("second")'));
+assert.ok(gameSource.includes('renderActions(`第二轮 · ${activity.title}`, `本轮只出现“${activity.title}”的专属选项。`, actions)'));
+assert.ok(!gameSource.includes("mixActivityAndCoreActions"));
+assert.ok(gameSource.includes("recordActionChronicle(action)"));
+assert.ok(gameSource.includes("renderRunRecap(endingId, ending.title)"));
+const campusActivityDetails = [...gameSource.matchAll(/secondDetail: "([^"]+)"/g)].map((match) => match[1]);
+assert.equal(campusActivityDetails.length, 17);
+assert.ok(campusActivityDetails.every((detail) => i18nSource.includes(`"${detail}":`)));
 assert.ok(fs.readFileSync(".github/workflows/pages.yml", "utf8").includes("run: node test.js"));
+assert.ok(fs.readFileSync(".github/workflows/pages.yml", "utf8").includes("run-recap.js"));
 assert.ok(fs.readFileSync(".github/workflows/pages.yml", "utf8").includes("event-generator.js"));
-assert.ok(fs.readFileSync("i18n.js", "utf8").includes('"堵车": "Traffic Jam"'));
+assert.ok(i18nSource.includes('"堵车": "Traffic Jam"'));
 const creatorSource = fs.readFileSync("creator.js", "utf8");
 assert.ok(creatorSource.includes('STATIC_SCHOOLS_KEY = "schooltopia_static_schools_v2"'));
 assert.ok(creatorSource.includes("buildShareUrl(window.location.href"));
 assert.ok(fs.readFileSync("schooltopia.js", "utf8").includes("const triggeredEvents = events.filter"));
+
+let chronicle = [];
+chronicle = recordEntry(chronicle, { week: 1, kind: "daily", title: "日常行动", choice: "认真听课" });
+chronicle = recordEntry(chronicle, { week: 1, kind: "activity", title: "开学典礼", choice: "临时救场" });
+chronicle = recordEntry(chronicle, { week: 1, kind: "event", title: "堵车", choice: "冲进校门" });
+chronicle = recordEntry(chronicle, { week: 2, kind: "daily", title: "日常行动", choice: "去操场" });
+const groupedChronicle = buildChronicle(chronicle);
+assert.equal(groupedChronicle.length, 2);
+assert.equal(groupedChronicle[0].daily.choice, "认真听课");
+assert.equal(groupedChronicle[0].activity.title, "开学典礼");
+assert.equal(groupedChronicle[0].events[0].title, "堵车");
+
+const ordinaryReport = calculateRunReport({
+  stats: { wisdom: 5, stamina: 5, mood: 5, peerFavor: 5, homeroomTrust: 5 },
+  week: 12,
+  difficulty: "standard",
+  endingId: "ending_ordinary_graduate",
+  chronicle,
+});
+const memorableFailure = calculateRunReport({
+  stats: { wisdom: 2, stamina: 0, mood: 0, peerFavor: 1, homeroomTrust: 2 },
+  week: 4,
+  difficulty: "hell",
+  endingId: "ending_complete_madness",
+  chronicle,
+});
+assert.ok(ordinaryReport.score >= 0 && ordinaryReport.score <= 100);
+assert.equal(ordinaryReport.rarityId, "common");
+assert.equal(memorableFailure.rarityId, "legendary");
+assert.deepEqual(
+  getMemoryCandidates({ wisdom: 9, stamina: 4, mood: 8, peerFavor: 3, homeroomTrust: 7 }, "student"),
+  [
+    { slot: "focus", stat: "wisdom", value: 9 },
+    { slot: "mood", stat: "mood", value: 8 },
+    { slot: "trust", stat: "homeroomTrust", value: 7 },
+  ]
+);
+assert.equal(memoryStatForRoute({ slot: "focus" }, "teacher"), "authority");
+assert.equal(normalizeMemory({ slot: "unknown" }), null);
 
 const now = Date.now();
 const retainedResearch = {

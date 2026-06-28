@@ -13,6 +13,7 @@ const PUBLIC_FILES = new Set([
   "/shared-config.js",
   "/game.js",
   "/schooltopia.js",
+  "/run-recap.js",
   "/share-cover.png",
   "/share-cover.svg",
   "/admin.css",

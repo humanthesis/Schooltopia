@@ -92,6 +92,7 @@
     "每周选择一次": "Choose once each week",
     "本次变化": "Recent Changes",
     "选择后会在这里显示属性变化。": "Stat changes will appear here after each choice.",
+    "未变化": "No Change",
     "状态": "Status",
     "称号": "Titles",
     "成就": "Achievements",
@@ -99,11 +100,38 @@
     "无": "None",
     "存档": "Save",
     "日常或午饭选择时可保存": "Save during daily or lunch choices",
+    "日常行动或校园活动时可保存": "Save during daily actions or campus activities",
     "系统记录": "System Log",
     "等待行动": "Waiting",
     "重新开始": "Restart",
     "确定要重新开始吗？当前这一局会丢失。": "Restart? This run will be lost.",
     "最终结局": "Final Ending",
+    "上局记忆": "Previous Run Memory",
+    "开始后初始属性 +1": "Starting stat +1 when the run begins",
+    "放下上局记忆": "Discard previous run memory",
+    "不继承": "Do Not Inherit",
+    "本局总评": "Run Score",
+    "命运稀有度": "Fate Rarity",
+    "普通": "Common",
+    "少见": "Uncommon",
+    "罕见": "Rare",
+    "传奇": "Legendary",
+    "本学期编年史": "Semester Chronicle",
+    "你负责选择，命运负责乱写。": "You make the choices. Fate writes whatever it wants.",
+    "带走一项记忆": "Carry One Memory Forward",
+    "从本局最突出的三项属性中选一项，下一局对应初始属性 +1。": "Choose one of this run's three strongest stats. Its matching starting stat gains +1 next run.",
+    "下一局 +1": "Next Run +1",
+    "这段记忆已保存。重新开始后生效。": "Memory saved. It will take effect when you restart.",
+    "带着记忆重新开始": "Restart with Memory",
+    "日常": "Daily",
+    "活动": "Activity",
+    "命运": "Fate",
+    "还没来得及选择，结局先到了。": "The ending arrived before you had time to choose.",
+    "你没有活过校园，是校园勉强活过了你。": "You did not survive campus. Campus barely survived you.",
+    "教务系统决定把你标记为异常样本。": "The academic system has classified you as an anomalous sample.",
+    "你活下来了，代价被系统礼貌地隐藏。": "You survived. The system has politely hidden the cost.",
+    "这不是失败，是一份很有个人风格的事故报告。": "This is not failure. It is an incident report with a very personal style.",
+    "数值不高，但故事已经足够让下一届害怕。": "The stats are low, but the story is enough to frighten next year's class.",
     "本局研究摘要": "Run Research Summary",
     "完成一局后，这里会生成匿名研究摘要。": "After a run, an anonymous research summary appears here.",
     "校园体验反馈": "Campus Experience Feedback",
@@ -424,6 +452,15 @@
     "第二轮": "Round 2",
     "校园行动 · 第一轮": "Campus Action · Round 1",
     "校园行动 · 第二轮": "Campus Action · Round 2",
+    "日常行动第一轮": "Daily Action Round",
+    "校园活动第二轮": "Campus Activity Round",
+    "日常行动已跳过": "Daily Action Skipped",
+    "校园活动": "Campus Activity",
+    "第一轮 · 日常行动": "Round 1 · Daily Action",
+    "第二轮 · 校园活动": "Round 2 · Campus Activity",
+    "正常上课与课间": "Classes and Breaks",
+    "上课 / 课间": "Class / Break",
+    "午休 / 课后": "Lunch / After Class",
     "普通周": "Regular Week",
     "周初判定": "Week Opening",
     "事件判定": "Event Check",
@@ -432,6 +469,9 @@
     "到现场：选一种处理方式": "On site: choose a response",
     "状态不足，本轮跳过": "Not enough stamina. This round is skipped.",
     "进入第二轮": "Continue to Round 2",
+    "状态不足，日常行动跳过": "Not enough stamina. The daily action is skipped.",
+    "进入校园活动": "Enter Campus Activity",
+    "上课、课间或午休：选择一项日常行动": "Class, break, or lunch: choose one daily action",
     "继续": "Continue",
     "暂存事件": "Hold Event",
     "继续处理暂存事件": "Resume Held Event",
@@ -462,6 +502,26 @@
     "服务部合作项目拓展": "Service Partnership Expansion",
     "轮岗与岗位匹配": "Role Rotation and Matching",
     "下学期活动准备梳理": "Next-Term Activity Planning",
+    "嘉宾还没到，你需要把台上的三十秒变得像原计划。": "The guest has not arrived. Make the next thirty seconds onstage look intentional.",
+    "在全校面前把新团队介绍清楚，也给没被看见的人留位置。": "Introduce the new team clearly to the school while leaving room for those who were overlooked.",
+    "把部门目标、合作方式和第一项任务讲明白。": "Make the department goals, working style, and first task clear.",
+    "用最少打扰完成布置，并在上课前恢复现场。": "Finish the setup with minimal disruption and restore the room before class.",
+    "让同伴专挑漏洞，提前发现最难回答的问题。": "Ask peers to find the gaps before the hardest questions arrive.",
+    "临时处理串场、缺货和音响失灵，让现场继续流动。": "Handle transitions, shortages, and sound failures without stopping the event.",
+    "检录提前、物资走错，你决定先救最影响全局的一环。": "Check-in moves early and supplies go missing. Rescue the failure that affects the whole event first.",
+    "节目临时延长，你要重新安排演讲与表演的衔接。": "A performance runs long. Rebuild the transition between talks and acts.",
+    "补齐数据、见证和反思，让申报不只剩漂亮形容词。": "Add evidence, testimony, and reflection so the application is more than polished adjectives.",
+    "收摊后公开数字，让每一笔收入都能被追溯。": "Publish the numbers after closing so every payment can be traced.",
+    "不绕开质疑，说明你会如何处理资源冲突和团队分歧。": "Answer the challenge directly and explain how you would handle resource conflicts and team disagreements.",
+    "两个节目同时到场，临时协调空间、时间和观众动线。": "Two performances arrive at once. Rework the space, schedule, and audience flow.",
+    "名单、奖项和上台顺序临时变化，你要保证没有人被叫错。": "The names, awards, and stage order change at the last minute. Make sure nobody is announced incorrectly.",
+    "让新团队亲手做一次，你只在关键节点提供支持。": "Let the new team do it themselves while you support only the critical moments.",
+    "控制人数和承诺范围，用真实反馈决定是否继续。": "Limit the group and promises, then use real feedback to decide whether to continue.",
+    "先用短任务验证匹配，再决定正式岗位。": "Test the match with a short task before assigning permanent roles.",
+    "用影响而不是惯例做判断，为团队留出真实余量。": "Judge by impact instead of habit and leave the team real breathing room.",
+    "DDL 正在靠近。": "A deadline is getting closer.",
+    "你们吃的不是饭，是小组作业时期的人脉保险。": "This is less a meal than social insurance for the next group project.",
+    "你没有变快乐，但身体重新上线了一点。": "You are not happier, but your body has come back online.",
     "完整彩排一遍": "Run a Full Rehearsal",
     "让学生即兴开场": "Let Students Improvise the Opening",
     "删掉一半流程": "Cut Half the Program",
@@ -729,14 +789,22 @@
       if (match) return `Save ${match[1]}`;
       match = line.match(/^保存时间：(.+)$/);
       if (match) return `Saved: ${match[1]}`;
+      match = line.match(/^已读取存档 (\d+)。$/);
+      if (match) return `Loaded Save Slot ${match[1]}.`;
+      match = line.match(/^本局 (\d+)\/10$/);
+      if (match) return `This Run ${match[1]}/10`;
+      match = line.match(/^上局记忆生效：(.+) \+1。$/);
+      if (match) return `Previous run memory applied: ${phrase(match[1])} +1.`;
       match = line.match(/^(.+) ([+-]1)$/);
       if (match && EN[match[1]]) return `${EN[match[1]]} ${match[2]}`;
-      match = line.match(/^(学生路线|教师路线) · 第 (\d+) 周 · (校园行动第一轮|校园行动第二轮|第一轮已跳过) · (.+)$/);
+      match = line.match(/^(学生路线|教师路线) · 第 (\d+) 周 · (校园行动第一轮|校园行动第二轮|第一轮已跳过|日常行动第一轮|校园活动第二轮|日常行动已跳过) · (.+)$/);
       if (match) return `${phrase(match[1])} · Week ${match[2]} · ${phrase(match[3])} · ${phrase(match[4])}`;
       match = line.match(/^(?:第 (\d+) 周|Week (\d+)) · 校园行动 · (第一轮|第二轮)$/);
       if (match) return `Week ${match[1] || match[2]} · Campus Action · ${phrase(match[3])}`;
       match = line.match(/^(第一轮|第二轮) · (.+)$/);
       if (match) return `${phrase(match[1])} · ${phrase(match[2])}`;
+      match = line.match(/^本轮只出现“(.+)”的专属选项。$/);
+      if (match) return `Only choices unique to "${phrase(match[1])}" appear this round.`;
       match = line.match(/^本周活动：(.+)。$/);
       if (match) return `This week's activity: ${phrase(match[1])}.`;
       match = line.match(/^(.+)(提升|降低) (\d+)$/);
@@ -805,10 +873,18 @@
       if (match) return `保存 ${match[1]}`;
       match = line.match(/^Saved: (.+)$/);
       if (match) return `保存时间：${match[1]}`;
+      match = line.match(/^Loaded Save Slot (\d+)\.$/);
+      if (match) return `已读取存档 ${match[1]}。`;
+      match = line.match(/^This Run (\d+)\/10$/);
+      if (match) return `本局 ${match[1]}/10`;
+      match = line.match(/^Previous run memory applied: (.+) \+1\.$/);
+      if (match) return `上局记忆生效：${phrase(match[1])} +1。`;
       match = line.match(/^(.+) ([+-]1)$/);
       if (match && ZH[match[1]]) return `${ZH[match[1]]} ${match[2]}`;
-      match = line.match(/^(Student Route|Teacher Route) · Week (\d+) · (Campus Action Round 1|Campus Action Round 2|Round 1 Skipped) · (.+)$/);
+      match = line.match(/^(Student Route|Teacher Route) · Week (\d+) · (Campus Action Round 1|Campus Action Round 2|Round 1 Skipped|Daily Action Round|Campus Activity Round|Daily Action Skipped) · (.+)$/);
       if (match) return `${phrase(match[1])} · 第 ${match[2]} 周 · ${phrase(match[3])} · ${phrase(match[4])}`;
+      match = line.match(/^Only choices unique to "(.+)" appear this round\.$/);
+      if (match) return `本轮只出现“${phrase(match[1])}”的专属选项。`;
       match = line.match(/^Enable (.+)$/);
       if (match) return `启用 ${match[1]}`;
       match = line.match(/^Rules v(\d+)$/);

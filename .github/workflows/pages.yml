@@ -31,7 +31,7 @@ jobs:
       - name: Prepare public site
         run: |
           mkdir -p _site/vendor
-          cp index.html styles.css i18n.js shared-config.js schooltopia.js game.js _site/
+          cp index.html styles.css i18n.js shared-config.js schooltopia.js run-recap.js game.js _site/
           cp creator.html admin.css creator.css creator.js creator-audio.js event-generator.js _site/
           cp creator-3d-loader.js creator-3d.bundle.js _site/
           cp share-cover.png share-cover.svg .nojekyll _site/

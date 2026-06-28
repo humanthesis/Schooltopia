@@ -34,7 +34,7 @@
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2317201d'/%3E%3Cpath d='M10 43h44v7H10z' fill='%23f0c55f'/%3E%3Cpath d='M15 24h34v20H15z' fill='%23247a86'/%3E%3Cpath d='M12 20h40v6H12z' fill='%23b34536'/%3E%3Cpath d='M22 31h6v8h-6zm14 0h6v8h-6z' fill='%23fff7e6'/%3E%3C/svg%3E"
     />
-    <link rel="stylesheet" href="styles.css?v=20260628-2" />
+    <link rel="stylesheet" href="styles.css?v=20260628-4" />
   </head>
   <body>
     <main class="app-shell">
@@ -86,6 +86,14 @@
             <small id="difficultyLabel">标准模式</small>
           </div>
           <div class="difficulty-row" id="difficultyButtons"></div>
+          <div id="inheritedMemoryBanner" class="inherited-memory-banner hidden">
+            <div>
+              <small>上局记忆</small>
+              <strong id="inheritedMemoryName"></strong>
+              <span>开始后初始属性 +1</span>
+            </div>
+            <button id="clearInheritedMemory" type="button" aria-label="放下上局记忆" title="不继承">×</button>
+          </div>
           <button id="openCodexSetup" class="secondary-action compact-action" type="button">收集图鉴</button>
         </div>
 
@@ -187,7 +195,7 @@
           <div class="save-box">
             <div class="save-box-head">
               <strong>存档</strong>
-              <small id="saveHint">日常或午饭选择时可保存</small>
+              <small id="saveHint">日常行动或校园活动时可保存</small>
             </div>
             <div id="saveInGameSlots" class="save-button-row"></div>
           </div>
@@ -217,6 +225,36 @@
           <p class="kicker">最终结局</p>
           <h2 id="endingTitle"></h2>
           <div id="endingText"></div>
+          <section id="runRecap" class="run-recap" aria-labelledby="runRecapTitle">
+            <div class="ending-scoreboard">
+              <div>
+                <small>本局总评</small>
+                <strong id="endingScore">0</strong>
+              </div>
+              <div>
+                <small>命运稀有度</small>
+                <strong id="endingRarity">普通</strong>
+                <span id="endingVerdict"></span>
+              </div>
+            </div>
+            <div class="chronicle-head">
+              <div>
+                <small>12 WEEK CHRONICLE</small>
+                <h3 id="runRecapTitle">本学期编年史</h3>
+              </div>
+              <span>你负责选择，命运负责乱写。</span>
+            </div>
+            <ol id="endingChronicle" class="ending-chronicle"></ol>
+            <div class="memory-inheritance">
+              <div>
+                <small>NEW GAME +</small>
+                <h3>带走一项记忆</h3>
+                <p>从本局最突出的三项属性中选一项，下一局对应初始属性 +1。</p>
+              </div>
+              <div id="memoryOptions" class="memory-options"></div>
+              <p id="memoryStatus" class="memory-status" aria-live="polite"></p>
+            </div>
+          </section>
           <div class="session-insight-box">
             <strong>本局研究摘要</strong>
             <p id="sessionInsight">完成一局后，这里会生成匿名研究摘要。</p>
@@ -314,9 +352,10 @@
       </div>
     </div>
 
-    <script src="i18n.js?v=20260628-2"></script>
+    <script src="i18n.js?v=20260628-3"></script>
     <script src="shared-config.js?v=20260628-2"></script>
     <script src="schooltopia.js?v=20260628-2"></script>
-    <script src="game.js?v=20260628-2"></script>
+    <script src="run-recap.js?v=20260628-1"></script>
+    <script src="game.js?v=20260628-4"></script>
   </body>
 </html>
