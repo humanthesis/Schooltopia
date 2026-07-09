@@ -1,6 +1,5 @@
 (function () {
   const API = "/api";
-  const STATIC_SCHOOL_KEY = "schooltopia_static_school_v1";
   const STATIC_HOST =
     window.location.hostname.endsWith(".github.io") ||
     new URLSearchParams(window.location.search).has("static");
@@ -86,15 +85,7 @@
     try {
       const shared = window.SchooltopiaShare?.readShareUrl?.(window.location.href);
       if (shared) return shared;
-      const stored = JSON.parse(localStorage.getItem(STATIC_SCHOOL_KEY) || "null");
-      if (!stored) return fallback;
-      return window.SchooltopiaShare?.normalizeConfig?.({
-        ...fallback,
-        ...stored,
-        skin: { ...fallback.skin, ...(stored.skin || {}) },
-        weights: { ...fallback.weights, ...(stored.weights || {}) },
-        customEvents: Array.isArray(stored.customEvents) ? stored.customEvents : [],
-      }) || fallback;
+      return fallback;
     } catch {
       return fallback;
     }
@@ -150,17 +141,23 @@
 
   function setPrivacyCopy() {
     const note = document.getElementById("privacyNote");
+    const insightTitle = document.getElementById("sessionInsightTitle");
+    const deleteButton = document.getElementById("deleteResearchData");
     const consentWrap = document.getElementById("researchConsentWrap");
     const retention = document.querySelector(".retention-note");
     const consent = document.getElementById("researchConsent");
     if (consent) consent.checked = state.consent;
     if (STATIC_HOST) {
       consentWrap?.classList.add("hidden");
+      if (insightTitle) insightTitle.textContent = "本局回顾";
+      if (deleteButton) deleteButton.textContent = "清除匿名研究标识";
       if (note) note.textContent = "GitHub 公开版的学校设置、选择与结局只保存在当前浏览器，不会上传。年级段和玩家倾向只用于本机回顾，不改变玩法。";
       if (retention) retention.textContent = "清除浏览器网站数据即可删除这些本机记录。反馈框不会在离线版上传内容。";
       return;
     }
     consentWrap?.classList.remove("hidden");
+    if (insightTitle) insightTitle.textContent = "本局研究摘要";
+    if (deleteButton) deleteButton.textContent = "清除我的研究数据";
     if (note) note.textContent = "只有在你明确同意后，系统才会记录匿名路线、选择、属性变化、结局与主动反馈。";
     if (retention) retention.textContent = "在线研究记录最多保留 180 天；反馈请勿填写姓名或可识别个人的信息。";
   }
@@ -283,9 +280,9 @@
           option.textContent = localizedText(school.name);
           select.append(option);
         });
-        if (!state.schools.some((school) => school.id === state.profile.schoolId)) {
-          state.profile.schoolId = state.schools[0]?.id || "demo-school";
-        }
+        state.profile.schoolId = requestedSchool && state.schools.some((school) => school.id === requestedSchool)
+          ? requestedSchool
+          : state.schools[0]?.id || "demo-school";
         select.value = state.profile.schoolId;
         select.addEventListener("change", async () => {
           state.profile.schoolId = select.value;
@@ -431,8 +428,14 @@
     const ranked = Object.entries(stats)
       .filter(([key, value]) => labels[key] && Number.isFinite(Number(value)))
       .sort((a, b) => Number(a[1]) - Number(b[1]));
-    const pressure = ranked[0] ? labels[ranked[0][0]] : "状态";
-    const resource = ranked.at(-1) ? labels[ranked.at(-1)[0]] : "选择";
+    const pressureEntry = Object.entries(currentGame?.pressureLedger || {})
+      .filter(([key, value]) => labels[key] && Number(value) > 0)
+      .sort((a, b) => Number(b[1]) - Number(a[1]))[0];
+    const recoveryEntry = Object.entries(currentGame?.recoveryLedger || {})
+      .filter(([key, value]) => labels[key] && Number(value) > 0)
+      .sort((a, b) => Number(b[1]) - Number(a[1]))[0];
+    const pressure = pressureEntry ? labels[pressureEntry[0]] : ranked[0] ? labels[ranked[0][0]] : "状态";
+    const resource = recoveryEntry ? labels[recoveryEntry[0]] : ranked.at(-1) ? labels[ranked.at(-1)[0]] : "选择";
     const grade = state.profile.gradeBand === "upper" ? "高年级" : "低年级";
     const style = { academic: "学术型", social: "社交型", balanced: "平衡型" }[state.profile.playerStyle] || "平衡型";
     if (window.SchooltopiaI18n?.language === "en") {
@@ -513,7 +516,9 @@
     );
     if (!events.length) return null;
     const triggeredEvents = events.filter((event) => {
-      const chance = Number(event.chance || 0) * getEventMultiplier();
+      const chance = typeof helpers.eventChance === "function"
+        ? helpers.eventChance(Number(event.chance || 0))
+        : Number(event.chance || 0) * getEventMultiplier();
       return helpers.randomChance(chance);
     });
     if (!triggeredEvents.length) return null;
@@ -566,6 +571,9 @@
     getEventMultiplier,
     maybeCreateEvent,
     loadConfig,
+    get researchActive() {
+      return !STATIC_HOST && state.online && state.consent;
+    },
     get config() {
       return state.config;
     },

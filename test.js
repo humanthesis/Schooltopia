@@ -86,14 +86,21 @@ assert.ok(serverSharedUrl.startsWith("http://127.0.0.1:4180/index.html?static=1#
 
 const gameSource = fs.readFileSync("game.js", "utf8");
 const i18nSource = fs.readFileSync("i18n.js", "utf8");
+const schooltopiaSource = fs.readFileSync("schooltopia.js", "utf8");
+const indexSource = fs.readFileSync("index.html", "utf8");
 assert.ok(gameSource.includes("name.textContent = option.name"));
 assert.ok(!gameSource.includes("game.metaSave.totalAiCopyCount"));
 assert.ok(gameSource.includes("return buildNormalActionChoices(getAllStudentDailyActions(), getAllStudentLunchActions())"));
 assert.ok(gameSource.includes('return makeCampusActivityActions("second")'));
-assert.ok(gameSource.includes('renderActions(`第二轮 · ${activity.title}`, `本轮只出现“${activity.title}”的专属选项。`, actions)'));
+assert.ok(gameSource.includes('renderActions(`第二轮 · ${activity.title}`, activity.secondDetail || activity.brief, actions)'));
+assert.ok(gameSource.includes("detail: style.detail"));
 assert.ok(!gameSource.includes("mixActivityAndCoreActions"));
 assert.ok(gameSource.includes("recordActionChronicle(action)"));
 assert.ok(gameSource.includes("renderRunRecap(endingId, ending.title)"));
+assert.ok(gameSource.includes("function actionCostShortfalls(action)"));
+assert.ok(gameSource.includes("weeklyEventCount >= limit"));
+assert.ok(gameSource.includes("game.momentum = clamp(game.momentum + overflow, 0, 20)"));
+assert.ok(gameSource.includes("new IntersectionObserver"));
 const campusActivityDetails = [...gameSource.matchAll(/secondDetail: "([^"]+)"/g)].map((match) => match[1]);
 assert.equal(campusActivityDetails.length, 17);
 assert.ok(campusActivityDetails.every((detail) => i18nSource.includes(`"${detail}":`)));
@@ -104,7 +111,11 @@ assert.ok(i18nSource.includes('"堵车": "Traffic Jam"'));
 const creatorSource = fs.readFileSync("creator.js", "utf8");
 assert.ok(creatorSource.includes('STATIC_SCHOOLS_KEY = "schooltopia_static_schools_v2"'));
 assert.ok(creatorSource.includes("buildShareUrl(window.location.href"));
-assert.ok(fs.readFileSync("schooltopia.js", "utf8").includes("const triggeredEvents = events.filter"));
+assert.ok(schooltopiaSource.includes("const triggeredEvents = events.filter"));
+assert.ok(schooltopiaSource.includes('typeof helpers.eventChance === "function"'));
+assert.ok(!schooltopiaSource.includes("localStorage.getItem(STATIC_SCHOOL_KEY"));
+assert.ok(indexSource.includes('id="logAnnouncement"'));
+assert.ok(indexSource.includes('id="scoreBreakdown"'));
 
 let chronicle = [];
 chronicle = recordEntry(chronicle, { week: 1, kind: "daily", title: "日常行动", choice: "认真听课" });
@@ -124,6 +135,14 @@ const ordinaryReport = calculateRunReport({
   endingId: "ending_ordinary_graduate",
   chronicle,
 });
+const momentumReport = calculateRunReport({
+  stats: { wisdom: 5, stamina: 5, mood: 5, peerFavor: 5, homeroomTrust: 5 },
+  week: 12,
+  difficulty: "standard",
+  endingId: "ending_ordinary_graduate",
+  momentum: 7,
+  chronicle,
+});
 const memorableFailure = calculateRunReport({
   stats: { wisdom: 2, stamina: 0, mood: 0, peerFavor: 1, homeroomTrust: 2 },
   week: 4,
@@ -132,6 +151,9 @@ const memorableFailure = calculateRunReport({
   chronicle,
 });
 assert.ok(ordinaryReport.score >= 0 && ordinaryReport.score <= 100);
+assert.equal(ordinaryReport.breakdown.momentum, 0);
+assert.equal(momentumReport.breakdown.momentum, 7);
+assert.equal(momentumReport.rawScore, ordinaryReport.rawScore + 7);
 assert.equal(ordinaryReport.rarityId, "common");
 assert.equal(memorableFailure.rarityId, "legendary");
 assert.deepEqual(

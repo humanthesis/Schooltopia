@@ -94,10 +94,16 @@
     const achievementCount = countCollection(input.achievements);
     const titleCount = countCollection(input.titles);
     const week = clamp(Math.round(Number(input.week) || 1), 1, 12);
-    const difficultyBonus = { easy: 0, standard: 3, hell: 8 }[input.difficulty] || 0;
-    const score = clamp(Math.round(
-      average * 6 + week * 1.5 + Math.min(12, achievementCount * 4) + Math.min(8, titleCount * 2) + difficultyBonus
-    ), 0, 100);
+    const breakdown = {
+      stats: Math.round(average * 6),
+      survival: Math.round(week * 1.5),
+      achievements: Math.min(12, achievementCount * 4),
+      titles: Math.min(8, titleCount * 2),
+      difficulty: { easy: 0, standard: 3, hell: 8 }[input.difficulty] || 0,
+      momentum: Math.min(8, Math.max(0, Math.round(Number(input.momentum) || 0))),
+    };
+    const rawScore = Object.values(breakdown).reduce((sum, value) => sum + value, 0);
+    const score = clamp(rawScore, 0, 100);
     const eventCount = normalizeChronicle(input.chronicle).filter((entry) => entry.kind === "event").length;
     const rarityPoints = endingRarityBase(input.endingId)
       + Math.min(6, achievementCount * 2)
@@ -106,7 +112,7 @@
       + (input.difficulty === "hell" ? 2 : 0);
     const rarityId = rarityPoints >= 13 ? "legendary" : rarityPoints >= 8 ? "rare" : rarityPoints >= 4 ? "uncommon" : "common";
     const verdictId = score >= 90 ? "mythic" : score >= 75 ? "exceptional" : score >= 55 ? "survivor" : score >= 35 ? "accident" : "story";
-    return { score, rarityId, rarityPoints, verdictId };
+    return { score, rawScore, breakdown, rarityId, rarityPoints, verdictId };
   }
 
   function memoryStatForRoute(memory, route) {

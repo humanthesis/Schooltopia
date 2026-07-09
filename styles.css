@@ -32,6 +32,18 @@
   box-sizing: border-box;
 }
 
+.sr-only {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+
 html,
 body {
   min-height: 100%;
@@ -534,7 +546,7 @@ h1 {
 
 .game-grid {
   display: grid;
-  grid-template-columns: minmax(250px, 0.78fr) minmax(360px, 1.28fr) minmax(280px, 0.94fr);
+  grid-template-columns: minmax(270px, 0.78fr) minmax(0, 2.22fr);
   gap: 16px;
   align-items: start;
 }
@@ -1290,6 +1302,25 @@ h1 {
   gap: 10px;
 }
 
+.action-panel {
+  grid-column: 2;
+  grid-row: 2;
+}
+
+.log-panel {
+  grid-column: 2;
+  grid-row: 3;
+}
+
+.stats-panel {
+  grid-column: 1;
+  grid-row: 2 / span 2;
+}
+
+.action-panel .action-list {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .action-panel.activity-round {
   border-top-color: var(--school-accent);
 }
@@ -1461,6 +1492,13 @@ h1 {
   color: var(--ink);
   font-weight: 850;
   white-space: normal;
+}
+
+.action-card .action-copy > .action-lock-reason {
+  margin-top: 8px;
+  color: var(--danger);
+  font-size: 0.72rem;
+  font-weight: 900;
 }
 
 .log-list {
@@ -1882,6 +1920,65 @@ html[lang="zh-CN"] .log-entry:first-child::before {
   line-height: 1.55;
 }
 
+.score-breakdown {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 7px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.score-breakdown > span {
+  min-width: 0;
+  padding: 8px;
+  background: rgba(36, 122, 134, 0.07);
+  border-left: 3px solid var(--school-primary);
+}
+
+.score-breakdown small,
+.score-breakdown b {
+  display: block;
+}
+
+.score-breakdown small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.score-breakdown b {
+  margin-top: 3px;
+  color: var(--ink);
+}
+
+.score-breakdown p {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.74rem;
+}
+
+.ending-alternatives {
+  display: grid;
+  gap: 4px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.ending-alternatives small {
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 900;
+}
+
+.ending-alternatives strong {
+  color: var(--school-primary);
+  font-size: 0.86rem;
+}
+
 .chronicle-head {
   display: flex;
   align-items: end;
@@ -1913,11 +2010,21 @@ html[lang="zh-CN"] .log-entry:first-child::before {
 }
 
 .ending-chronicle li {
-  display: grid;
-  grid-template-columns: 82px minmax(0, 1fr);
-  gap: 14px;
-  padding: 12px 0;
   border-bottom: 1px solid var(--line);
+}
+
+.ending-chronicle details {
+  padding: 11px 0;
+}
+
+.ending-chronicle summary {
+  cursor: pointer;
+  list-style-position: inside;
+}
+
+.ending-chronicle details[open] .chronicle-lines {
+  margin-top: 9px;
+  padding-left: 20px;
 }
 
 .chronicle-week {
@@ -2095,6 +2202,16 @@ html[lang="zh-CN"] .log-entry:first-child::before {
 
   .game-hud {
     grid-template-columns: 1fr;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    min-height: 0;
+    padding: 8px;
+  }
+
+  .game-hud > div:first-child,
+  .game-hud > .compact-action {
+    display: none;
   }
 
   .hud-stats,
@@ -2104,16 +2221,37 @@ html[lang="zh-CN"] .log-entry:first-child::before {
     grid-template-columns: 1fr;
   }
 
+  .hud-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .hud-chip {
+    min-height: 36px;
+    padding: 5px 7px;
+  }
+
+  .action-panel .action-list {
+    grid-template-columns: 1fr;
+  }
+
   .action-panel {
     order: 1;
+    grid-column: auto;
+    grid-row: auto;
+    scroll-margin-top: 100px;
   }
 
   .stats-panel {
     order: 2;
+    grid-column: auto;
+    grid-row: auto;
   }
 
   .log-panel {
     order: 3;
+    grid-column: auto;
+    grid-row: auto;
   }
 
   .stats-panel,
@@ -2222,6 +2360,10 @@ html[lang="zh-CN"] .log-entry:first-child::before {
     grid-template-columns: 1fr;
   }
 
+  .score-breakdown {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .chronicle-head {
     align-items: flex-start;
     flex-direction: column;
@@ -2231,8 +2373,7 @@ html[lang="zh-CN"] .log-entry:first-child::before {
     text-align: left;
   }
 
-  .ending-chronicle li {
-    grid-template-columns: 1fr;
-    gap: 6px;
+  .ending-chronicle details[open] .chronicle-lines {
+    padding-left: 8px;
   }
 }

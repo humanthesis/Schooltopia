@@ -4,6 +4,7 @@
     "Schooltopia Studio · 创建我的学校": "Schooltopia Studio · Build Your School",
     "创建学校": "Create School",
     "立即开始": "Play Now",
+    "前往开局": "Go to Setup",
     "返回游戏": "Back to Game",
     "音乐 开": "Music On",
     "音乐 关": "Music Off",
@@ -19,6 +20,8 @@
     "欢迎进入 Schooltopia。校园规则正在加载。": "Welcome to Schooltopia. Campus rules are loading.",
     "欢迎进入 Schooltopia。校园规则正在运行。": "Welcome to Schooltopia. Campus rules are running.",
     "身份系统": "Identity System",
+    "路线选择": "Route Selection",
+    "身份选择": "Identity Selection",
     "开局选择": "Start Setup",
     "难度选择": "Difficulty",
     "标准模式": "Standard Mode",
@@ -73,12 +76,14 @@
     "同学好感": "Peer Favor",
     "班主任信任度": "Homeroom Trust",
     "班主任信任": "Homeroom Trust",
+    "信任": "Trust",
     "教学威严": "Authority",
     "教师体能": "Teacher Stamina",
     "教师心情": "Teacher Mood",
     "学生好感": "Student Favor",
     "年级组信任度": "Grade Trust",
     "年级组信任": "Grade Trust",
+    "年级组": "Grade Team",
     "智慧 / 教师威严": "Wisdom / Authority",
     "体能 / 教师体能": "Stamina / Teacher Stamina",
     "心情 / 教师心情": "Mood / Teacher Mood",
@@ -112,6 +117,13 @@
     "不继承": "Do Not Inherit",
     "本局总评": "Run Score",
     "命运稀有度": "Fate Rarity",
+    "最终属性": "Final Stats",
+    "存活周数": "Weeks Survived",
+    "难度": "Difficulty",
+    "声望": "Reputation",
+    "校园声望": "Campus Reputation",
+    "教学声望": "Teaching Reputation",
+    "本局同时达成": "Also Achieved This Run",
     "普通": "Common",
     "少见": "Uncommon",
     "罕见": "Rare",
@@ -133,6 +145,16 @@
     "这不是失败，是一份很有个人风格的事故报告。": "This is not failure. It is an incident report with a very personal style.",
     "数值不高，但故事已经足够让下一届害怕。": "The stats are low, but the story is enough to frighten next year's class.",
     "本局研究摘要": "Run Research Summary",
+    "本局回顾": "Run Recap",
+    "清除匿名研究标识": "Clear Anonymous Research ID",
+    "重置全部游戏进度": "Reset All Game Progress",
+    "确定要重置全部游戏进度吗？这会清空三个存档、图鉴、累计记录和跨局记忆，不影响创建器里的学校。": "Reset all game progress? This clears all three saves, collections, cumulative records, and inherited memory without changing schools in the creator.",
+    "当前状态无法选择这项行动。": "This action is unavailable in your current state.",
+    "退出现场，回办公室调整": "Leave and Recover in the Office",
+    "退出现场，去医务室调整": "Leave and Recover in the Infirmary",
+    "当所有方案都付不起成本时，先恢复到能继续做决定的状态。": "When every plan costs more than you can pay, recover enough to make another decision.",
+    "你暂时离开了活动现场。活着回来也是项目管理的一部分。": "You stepped away from the event. Returning alive is also project management.",
+    "你无法真正逃离 Schooltopia。因为当你开始讲述这段校园生活时，它已经成为了你的故事。": "You cannot truly escape Schooltopia. Once you tell this campus story, it has already become part of your life.",
     "完成一局后，这里会生成匿名研究摘要。": "After a run, an anonymous research summary appears here.",
     "校园体验反馈": "Campus Experience Feedback",
     "用于生成下一版研究洞察": "Helps shape the next research report",
@@ -341,6 +363,9 @@
     "开局 14 点，随机事件更少，期末要求更低，适合熟悉规则和体验主线。": "Start with 14 points, fewer random events, and easier finals. Best for learning the rules and following the main story.",
     "开局 10 点，保留原本节奏，事件和期末压力比较均衡。": "Start with 10 points. Events and finals pressure follow the intended balanced pace.",
     "开局 6 点，事件更密集，期末额外扣状态，Project 和考试要求更高。": "Start with 6 points, denser events, extra finals drain, and tougher project and exam requirements.",
+    "开局 14 点，每周最多 1 个随机事件，期末要求更低，适合熟悉规则和体验主线。": "Start with 14 points and at most 1 random event per week, with easier finals.",
+    "开局 10 点，每周最多 2 个随机事件，事件和期末压力比较均衡。": "Start with 10 points and at most 2 random events per week, with balanced finals pressure.",
+    "开局 6 点，每周最多 3 个随机事件，大额恢复会少 1 点，期末要求更高。": "Start with 6 points and at most 3 random events per week. Large recovery gains lose 1 point and finals are harder.",
     "先把步骤想清楚，出错机会较少。": "Plan the steps first to reduce mistakes.",
     "做法更新鲜，现场气氛会更好。": "A fresher approach improves the atmosphere.",
     "靠大家一起完成，关系会变好。": "Complete it together and strengthen relationships.",
@@ -726,6 +751,7 @@
     "有人问：": "Someone asks:",
     "你说：": "You say:",
     "普通地批了作业。": "You graded homework normally.",
+    "你普通地完成了这个学期。": "You completed this semester normally.",
     "普通地开完会。": "You finished meetings normally.",
     "普通地熬过了期末。": "You survived finals normally.",
     "在 Schooltopia，普通下班本身就是一种隐藏成就。": "In Schooltopia, leaving work normally is a hidden achievement by itself.",
@@ -795,6 +821,22 @@
       if (match) return `This Run ${match[1]}/10`;
       match = line.match(/^上局记忆生效：(.+) \+1。$/);
       if (match) return `Previous run memory applied: ${phrase(match[1])} +1.`;
+      match = line.match(/^属性不足：(.+)$/);
+      if (match) {
+        const costs = match[1].split("；").map((part) => {
+          const cost = part.match(/^(.+)需要 (\d+)，当前 (\d+)$/);
+          return cost ? `${phrase(cost[1])}: need ${cost[2]}, current ${cost[3]}` : phrase(part);
+        });
+        return `Not enough stats: ${costs.join("; ")}`;
+      }
+      match = line.match(/^(.+)的溢出提升转化为(校园声望|教学声望) \+(\d+)。$/);
+      if (match) return `${phrase(match[1])} overflow became ${phrase(match[2])} +${match[3]}.`;
+      match = line.match(/^本周随机事件已达上限（(\d+)），其余事件顺延到命运的未读消息里。$/);
+      if (match) return `This week's random-event limit (${match[1]}) has been reached. The rest remain in fate's unread messages.`;
+      match = line.match(/^原始总分 (\d+)，总评最高记为 100。$/);
+      if (match) return `Raw score ${match[1]}; the run score is capped at 100.`;
+      match = line.match(/^第 (\d+) 周 · (\d+) 条记录$/);
+      if (match) return `Week ${match[1]} · ${match[2]} entries`;
       match = line.match(/^(.+) ([+-]1)$/);
       if (match && EN[match[1]]) return `${EN[match[1]]} ${match[2]}`;
       match = line.match(/^(学生路线|教师路线) · 第 (\d+) 周 · (校园行动第一轮|校园行动第二轮|第一轮已跳过|日常行动第一轮|校园活动第二轮|日常行动已跳过) · (.+)$/);
@@ -879,8 +921,30 @@
       if (match) return `本局 ${match[1]}/10`;
       match = line.match(/^Previous run memory applied: (.+) \+1\.$/);
       if (match) return `上局记忆生效：${phrase(match[1])} +1。`;
+      match = line.match(/^Not enough stats: (.+)$/);
+      if (match) {
+        const costs = match[1].split("; ").map((part) => {
+          const cost = part.match(/^(.+): need (\d+), current (\d+)$/);
+          return cost ? `${phrase(cost[1])}需要 ${cost[2]}，当前 ${cost[3]}` : phrase(part);
+        });
+        return `属性不足：${costs.join("；")}`;
+      }
+      match = line.match(/^(.+) overflow became (Campus Reputation|Teaching Reputation) \+(\d+)\.$/);
+      if (match) return `${phrase(match[1])}的溢出提升转化为${phrase(match[2])} +${match[3]}。`;
+      match = line.match(/^This week's random-event limit \((\d+)\) has been reached\. The rest remain in fate's unread messages\.$/);
+      if (match) return `本周随机事件已达上限（${match[1]}），其余事件顺延到命运的未读消息里。`;
+      match = line.match(/^Raw score (\d+); the run score is capped at 100\.$/);
+      if (match) return `原始总分 ${match[1]}，总评最高记为 100。`;
+      match = line.match(/^Week (\d+) · (\d+) entries$/);
+      if (match) return `第 ${match[1]} 周 · ${match[2]} 条记录`;
       match = line.match(/^(.+) ([+-]1)$/);
       if (match && ZH[match[1]]) return `${ZH[match[1]]} ${match[2]}`;
+      match = line.match(/^(Student Route|Teacher Route) · (Relaxed Mode|Standard Mode|Finals Inferno)$/);
+      if (match) return `${phrase(match[1])} · ${phrase(match[2])}`;
+      match = line.match(/^(Student|Teacher) · (Commuter|Boarder|Teacher)$/);
+      if (match) return `${phrase(match[1])} · ${phrase(match[2])}`;
+      match = line.match(/^(Relaxed Mode|Standard Mode|Finals Inferno) \| (Great Shape|Holding On|Near Collapse) \| Week (\d+)\/12$/);
+      if (match) return `${phrase(match[1])} | ${phrase(match[2])} | 第 ${match[3]}/12 周`;
       match = line.match(/^(Student Route|Teacher Route) · Week (\d+) · (Campus Action Round 1|Campus Action Round 2|Round 1 Skipped|Daily Action Round|Campus Activity Round|Daily Action Skipped) · (.+)$/);
       if (match) return `${phrase(match[1])} · 第 ${match[2]} 周 · ${phrase(match[3])} · ${phrase(match[4])}`;
       match = line.match(/^Only choices unique to "(.+)" appear this round\.$/);

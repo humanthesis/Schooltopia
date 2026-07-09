@@ -34,7 +34,7 @@
       rel="icon"
       href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2317201d'/%3E%3Cpath d='M10 43h44v7H10z' fill='%23f0c55f'/%3E%3Cpath d='M15 24h34v20H15z' fill='%23247a86'/%3E%3Cpath d='M12 20h40v6H12z' fill='%23b34536'/%3E%3Cpath d='M22 31h6v8h-6zm14 0h6v8h-6z' fill='%23fff7e6'/%3E%3C/svg%3E"
     />
-    <link rel="stylesheet" href="styles.css?v=20260628-4" />
+    <link rel="stylesheet" href="styles.css?v=20260628-5" />
   </head>
   <body>
     <main class="app-shell">
@@ -43,7 +43,7 @@
         <div class="top-links">
           <a class="play-link" href="#setupView">
             <span class="play-mark" aria-hidden="true"></span>
-            <span>立即开始</span>
+            <span>前往开局</span>
           </a>
           <a class="creator-link" href="creator.html">
             <span class="school-create-mark" aria-hidden="true"></span>
@@ -79,13 +79,13 @@
             <span>身份系统</span>
             <small>开局选择</small>
           </div>
-          <div class="route-row" id="routeButtons"></div>
-          <div class="identity-row" id="identityButtons"></div>
+          <div class="route-row" id="routeButtons" role="group" aria-label="路线选择"></div>
+          <div class="identity-row" id="identityButtons" role="group" aria-label="身份选择"></div>
           <div class="setup-subhead">
             <span>难度选择</span>
             <small id="difficultyLabel">标准模式</small>
           </div>
-          <div class="difficulty-row" id="difficultyButtons"></div>
+          <div class="difficulty-row" id="difficultyButtons" role="group" aria-label="难度选择"></div>
           <div id="inheritedMemoryBanner" class="inherited-memory-banner hidden">
             <div>
               <small>上局记忆</small>
@@ -114,6 +114,7 @@
             <small>本地 3 个槽位</small>
           </div>
           <div id="saveSlotList" class="save-slot-list"></div>
+          <button id="resetAllGameData" class="privacy-delete-button" type="button">重置全部游戏进度</button>
         </div>
 
         <div class="panel research-profile-panel">
@@ -216,7 +217,8 @@
             <span>系统记录</span>
             <small id="roundState">等待行动</small>
           </div>
-          <div id="logList" class="log-list" aria-live="polite" aria-relevant="additions"></div>
+          <div id="logList" class="log-list"></div>
+          <p id="logAnnouncement" class="sr-only" aria-live="polite" aria-atomic="true"></p>
         </section>
       </section>
 
@@ -237,6 +239,8 @@
                 <span id="endingVerdict"></span>
               </div>
             </div>
+            <div id="scoreBreakdown" class="score-breakdown"></div>
+            <div id="endingAlternatives" class="ending-alternatives hidden"></div>
             <div class="chronicle-head">
               <div>
                 <small>12 WEEK CHRONICLE</small>
@@ -256,7 +260,7 @@
             </div>
           </section>
           <div class="session-insight-box">
-            <strong>本局研究摘要</strong>
+            <strong id="sessionInsightTitle">本局研究摘要</strong>
             <p id="sessionInsight">完成一局后，这里会生成匿名研究摘要。</p>
           </div>
           <section id="feedbackPanel" class="feedback-panel hidden">
@@ -352,10 +356,10 @@
       </div>
     </div>
 
-    <script src="i18n.js?v=20260628-3"></script>
+    <script src="i18n.js?v=20260628-5"></script>
     <script src="shared-config.js?v=20260628-2"></script>
-    <script src="schooltopia.js?v=20260628-2"></script>
-    <script src="run-recap.js?v=20260628-1"></script>
-    <script src="game.js?v=20260628-4"></script>
+    <script src="schooltopia.js?v=20260628-5"></script>
+    <script src="run-recap.js?v=20260628-5"></script>
+    <script src="game.js?v=20260628-5"></script>
   </body>
 </html>

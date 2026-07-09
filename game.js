@@ -147,7 +147,7 @@ const DIFFICULTIES = [
   {
     id: "easy",
     name: "轻松模式",
-    detail: "开局 14 点，随机事件更少，期末要求更低，适合熟悉规则和体验主线。",
+    detail: "开局 14 点，每周最多 1 个随机事件，期末要求更低，适合熟悉规则和体验主线。",
     setupPoints: 14,
     eventMultiplier: 0.65,
     rareMultiplier: 0.55,
@@ -160,11 +160,13 @@ const DIFFICULTIES = [
     baseLateRate: 8,
     rebellionBonus: -2,
     jingdezhenResidentRuns: 6,
+    weeklyEventLimit: 1,
+    recoveryPenalty: 0,
   },
   {
     id: "standard",
     name: "标准模式",
-    detail: "开局 10 点，保留原本节奏，事件和期末压力比较均衡。",
+    detail: "开局 10 点，每周最多 2 个随机事件，事件和期末压力比较均衡。",
     setupPoints: 10,
     eventMultiplier: 1,
     rareMultiplier: 1,
@@ -177,11 +179,13 @@ const DIFFICULTIES = [
     baseLateRate: 15,
     rebellionBonus: 0,
     jingdezhenResidentRuns: 5,
+    weeklyEventLimit: 2,
+    recoveryPenalty: 0,
   },
   {
     id: "hell",
     name: "地狱期末模式",
-    detail: "开局 6 点，事件更密集，期末额外扣状态，Project 和考试要求更高。",
+    detail: "开局 6 点，每周最多 3 个随机事件，大额恢复会少 1 点，期末要求更高。",
     setupPoints: 6,
     eventMultiplier: 1.35,
     rareMultiplier: 1.55,
@@ -194,6 +198,8 @@ const DIFFICULTIES = [
     baseLateRate: 30,
     rebellionBonus: 6,
     jingdezhenResidentRuns: 5,
+    weeklyEventLimit: 3,
+    recoveryPenalty: 1,
   },
 ];
 
@@ -753,6 +759,7 @@ let musicTimer = 0;
 let playgroundSources = [];
 let audioUnlocked = false;
 let lastStatSoundAt = 0;
+let renderScheduled = false;
 
 const SAVE_SLOT_COUNT = 3;
 const SAVE_STORAGE_PREFIX = "schooltopia_game_save_slot_";
@@ -776,6 +783,7 @@ const dom = {
   recommendedSetup: document.getElementById("recommendedSetup"),
   startGame: document.getElementById("startGame"),
   saveSlotList: document.getElementById("saveSlotList"),
+  resetAllGameData: document.getElementById("resetAllGameData"),
   openCodexSetup: document.getElementById("openCodexSetup"),
   setupView: document.getElementById("setupView"),
   gameView: document.getElementById("gameView"),
@@ -812,6 +820,7 @@ const dom = {
   actionSubtitle: document.getElementById("actionSubtitle"),
   actionList: document.getElementById("actionList"),
   logList: document.getElementById("logList"),
+  logAnnouncement: document.getElementById("logAnnouncement"),
   roundState: document.getElementById("roundState"),
   eventModal: document.getElementById("eventModal"),
   eventTitle: document.getElementById("eventTitle"),
@@ -823,6 +832,8 @@ const dom = {
   endingScore: document.getElementById("endingScore"),
   endingRarity: document.getElementById("endingRarity"),
   endingVerdict: document.getElementById("endingVerdict"),
+  scoreBreakdown: document.getElementById("scoreBreakdown"),
+  endingAlternatives: document.getElementById("endingAlternatives"),
   endingChronicle: document.getElementById("endingChronicle"),
   memoryOptions: document.getElementById("memoryOptions"),
   memoryStatus: document.getElementById("memoryStatus"),
@@ -1383,6 +1394,9 @@ function serializeGameForSave() {
     recentChanges: [...game.recentChanges],
     recentChangedStats: serializeSet(game.recentChangedStats),
     aiHabit: { ...game.aiHabit },
+    momentum: Number(game.momentum || 0),
+    pressureLedger: { ...game.pressureLedger },
+    recoveryLedger: { ...game.recoveryLedger },
     chronicle: window.SchooltopiaRunRecap?.normalizeChronicle?.(game.chronicle) || [],
     inheritedMemory: window.SchooltopiaRunRecap?.normalizeMemory?.(game.inheritedMemory) || null,
     log: [...game.log],
@@ -1435,6 +1449,9 @@ function reviveGameFromSave(save) {
   restored.recentChanges = Array.isArray(state.recentChanges) ? state.recentChanges.slice(0, 8) : [];
   restored.recentChangedStats = reviveSet(state.recentChangedStats);
   restored.aiHabit = { ...restored.aiHabit, ...(state.aiHabit || {}) };
+  restored.momentum = clamp(Number(state.momentum || 0), 0, 20);
+  restored.pressureLedger = { ...(state.pressureLedger || {}) };
+  restored.recoveryLedger = { ...(state.recoveryLedger || {}) };
   restored.chronicle = window.SchooltopiaRunRecap?.normalizeChronicle?.(state.chronicle) || [];
   restored.inheritedMemory = window.SchooltopiaRunRecap?.normalizeMemory?.(state.inheritedMemory) || null;
   restored.log = Array.isArray(state.log) ? state.log.slice(0, 120) : [];
@@ -1619,6 +1636,7 @@ function createGameState() {
     difficulty: setup.difficulty,
     gameEnded: false,
     currentEnding: null,
+    eligibleEndings: [],
     currentActionPhase: "daily",
     stats: { ...setup.stats },
     dynamicStatuses: new Set(),
@@ -1639,6 +1657,9 @@ function createGameState() {
       dependency: 0,
       risk: 0,
     },
+    momentum: 0,
+    pressureLedger: {},
+    recoveryLedger: {},
     chronicle: [],
     inheritedMemory: null,
     log: [],
@@ -1690,6 +1711,8 @@ function createGameState() {
       currentWeekChoseDailyPhysicalAction: false,
       shouldSkipDailyActionThisWeek: false,
       zeroStaminaPenaltyAppliedThisWeek: false,
+      weeklyEventCount: 0,
+      weeklyEventLimitNoticeShown: false,
       isFinalWeek: false,
       isCheckingThresholdRewards: false,
       eveningStudyWisdomGainModifier: 0,
@@ -1757,6 +1780,7 @@ function addLog(text) {
   if (!game || !text) return;
   game.log.unshift(text);
   game.log = game.log.slice(0, 120);
+  if (dom.logAnnouncement) dom.logAnnouncement.textContent = text;
   renderLog();
 }
 
@@ -1779,6 +1803,20 @@ function clearRecentChanges() {
   if (!game) return;
   game.recentChanges = [];
   game.recentChangedStats = new Set();
+}
+
+function rememberMomentumChange(actual) {
+  if (!game || actual <= 0) return;
+  const label = game.route === "teacher" ? "教学声望" : "校园声望";
+  game.recentChanges.unshift({
+    statName: "momentum",
+    label,
+    actual,
+    requestedDelta: actual,
+    max: 20,
+    value: game.momentum,
+  });
+  game.recentChanges = game.recentChanges.slice(0, 8);
 }
 
 function clearCompleteMadnessWarningIfRecovered(statName, actual) {
@@ -1817,6 +1855,11 @@ function applyStatChangeModifiers(route, statName, delta, reason = "") {
   ) {
     nextDelta -= 1;
   }
+  const recoveryStats = new Set(["stamina", "mood", "teacherStamina", "teacherMood"]);
+  const recoveryPenalty = difficultyConfig(game?.difficulty || setup.difficulty).recoveryPenalty || 0;
+  if (nextDelta > 1 && recoveryPenalty > 0 && recoveryStats.has(statName)) {
+    nextDelta = Math.max(1, nextDelta - recoveryPenalty);
+  }
   return window.Schooltopia?.adjustStatDelta?.({ route, statName, delta: nextDelta, reason }) ?? nextDelta;
 }
 
@@ -1827,9 +1870,23 @@ function applyStatChange(route, statName, delta, reason = "") {
 
   const finalDelta = applyStatChangeModifiers(route, statName, delta, reason);
   const before = game.stats[statName];
-  game.stats[statName] = clamp(before + finalDelta, 0, getStatMax(statName));
+  const statMax = getStatMax(statName);
+  game.stats[statName] = clamp(before + finalDelta, 0, statMax);
   const actual = game.stats[statName] - before;
+  const overflow = finalDelta > 0 ? Math.max(0, before + finalDelta - statMax) : 0;
   if (delta !== 0 || finalDelta !== 0) rememberStatChange(statName, actual, delta);
+  if (actual < 0) game.pressureLedger[statName] = Number(game.pressureLedger[statName] || 0) + Math.abs(actual);
+  if (actual > 0) game.recoveryLedger[statName] = Number(game.recoveryLedger[statName] || 0) + actual;
+  if (overflow > 0) {
+    const beforeMomentum = game.momentum;
+    game.momentum = clamp(game.momentum + overflow, 0, 20);
+    const momentumGain = game.momentum - beforeMomentum;
+    if (momentumGain > 0) {
+      rememberMomentumChange(momentumGain);
+      const momentumLabel = route === "teacher" ? "教学声望" : "校园声望";
+      addLog(`${statLabel(statName)}的溢出提升转化为${momentumLabel} +${momentumGain}。`);
+    }
+  }
   clearCompleteMadnessWarningIfRecovered(statName, actual);
 
   if (actual !== 0) {
@@ -1837,14 +1894,14 @@ function applyStatChange(route, statName, delta, reason = "") {
     addLog(`${statLabel(statName)}${actual > 0 ? "提升" : "降低"} ${Math.abs(actual)}`);
     if (delta > 0 && finalDelta < delta) {
       addLog(`${statLabel(statName)}这次提升被当前状态削弱了。`);
-    } else if (finalDelta > 0 && actual < finalDelta) {
+    } else if (finalDelta > 0 && actual < finalDelta && overflow === 0) {
       addLog(`${statLabel(statName)}接近上限，剩余提升没有继续增加。`);
     } else if (finalDelta < 0 && actual > finalDelta) {
       addLog(`${statLabel(statName)}接近下限，剩余降低没有继续扣除。`);
     }
   } else if (delta > 0 && finalDelta === 0) {
     addLog(`${statLabel(statName)}这次没有变化：当前状态抵消了这次提升。`);
-  } else if (finalDelta > 0) {
+  } else if (finalDelta > 0 && overflow === 0) {
     addLog(`${statLabel(statName)}已经到顶了。`);
   } else if (finalDelta < 0) {
     addLog(`${statLabel(statName)}已经到底了。`);
@@ -1854,7 +1911,7 @@ function applyStatChange(route, statName, delta, reason = "") {
   checkZeroStatPenalties();
   checkThresholdRewards();
   checkImmediateEndings();
-  renderAll();
+  scheduleRenderAll();
   return actual;
 }
 
@@ -2071,15 +2128,39 @@ function setSetupRoute(route) {
   setup.stats = makeStats(route);
   setup.points = setupPointTotal();
   renderSetup();
+  dom.routeButtons.querySelector(`[data-value="${route}"]`)?.focus();
 }
 
 function setSetupIdentity(identity) {
   setup.identity = identity;
   renderSetup();
+  dom.identityButtons.querySelector(`[data-value="${identity}"]`)?.focus();
 }
 
 function setSetupDifficulty(difficulty) {
   setup.difficulty = difficulty;
+  setup.stats = makeStats(setup.route);
+  setup.points = setupPointTotal();
+  renderSetup();
+  dom.difficultyButtons.querySelector(`[data-value="${difficulty}"]`)?.focus();
+}
+
+function resetAllGameData() {
+  const ok = window.confirm?.("确定要重置全部游戏进度吗？这会清空三个存档、图鉴、累计记录和跨局记忆，不影响创建器里的学校。") ?? true;
+  if (!ok) return;
+  try {
+    for (let slot = 1; slot <= SAVE_SLOT_COUNT; slot += 1) localStorage.removeItem(saveSlotKey(slot));
+    [
+      "schooltopia_total_jingdezhen",
+      "schooltopia_unlocked_events",
+      "schooltopia_unlocked_endings",
+      "schooltopia_unlocked_achievements",
+      INHERITED_MEMORY_KEY,
+    ].forEach((key) => localStorage.removeItem(key));
+  } catch {
+    // The visible setup still resets even if storage is unavailable.
+  }
+  metaSave = loadMetaSave();
   setup.stats = makeStats(setup.route);
   setup.points = setupPointTotal();
   renderSetup();
@@ -2135,6 +2216,8 @@ function renderSetup() {
     const button = document.createElement("button");
     button.type = "button";
     button.className = `choice-button${setup.route === route.id ? " active" : ""}`;
+    button.dataset.value = route.id;
+    button.setAttribute("aria-pressed", setup.route === route.id ? "true" : "false");
     button.innerHTML = `<strong>${route.name}</strong><small>${route.detail}</small>`;
     button.addEventListener("click", () => setSetupRoute(route.id));
     dom.routeButtons.append(button);
@@ -2147,6 +2230,8 @@ function renderSetup() {
     const button = document.createElement("button");
     button.type = "button";
     button.className = `choice-button${setup.identity === identity.id ? " active" : ""}`;
+    button.dataset.value = identity.id;
+    button.setAttribute("aria-pressed", setup.identity === identity.id ? "true" : "false");
     button.innerHTML = `<strong>${identity.name}</strong><small>${identity.detail}</small>`;
     button.addEventListener("click", () => setSetupIdentity(identity.id));
     dom.identityButtons.append(button);
@@ -2157,6 +2242,8 @@ function renderSetup() {
     const button = document.createElement("button");
     button.type = "button";
     button.className = `choice-button difficulty-button${setup.difficulty === difficulty.id ? " active" : ""}`;
+    button.dataset.value = difficulty.id;
+    button.setAttribute("aria-pressed", setup.difficulty === difficulty.id ? "true" : "false");
     button.innerHTML = `<strong>${difficulty.name}</strong><small>${difficulty.detail}</small>`;
     button.addEventListener("click", () => setSetupDifficulty(difficulty.id));
     dom.difficultyButtons.append(button);
@@ -2246,7 +2333,21 @@ function renderAll() {
   renderLog();
   renderInGameSaveControls();
   dom.weekLabel.textContent = game.week >= 12 ? "第 12 周" : `第 ${game.week} 周`;
-  dom.systemLine.textContent = game.gameEnded ? TEXT.finalPrompt : TEXT.systemLine;
+  dom.systemLine.textContent = game.gameEnded ? finalPromptText() : TEXT.systemLine;
+}
+
+function finalPromptText() {
+  if (window.Schooltopia?.researchActive) return TEXT.finalPrompt;
+  return "你无法真正逃离 Schooltopia。因为当你开始讲述这段校园生活时，它已经成为了你的故事。";
+}
+
+function scheduleRenderAll() {
+  if (renderScheduled) return;
+  renderScheduled = true;
+  queueMicrotask(() => {
+    renderScheduled = false;
+    renderAll();
+  });
 }
 
 function renderHud() {
@@ -2258,13 +2359,17 @@ function renderHud() {
     game.route === "student"
       ? [
           ["智慧", "wisdom"],
+          ["体能", "stamina"],
           ["心情", "mood"],
           ["同学", "peerFavor"],
+          ["信任", "homeroomTrust"],
         ]
       : [
           ["威严", "authority"],
           ["体能", "teacherStamina"],
+          ["心情", "teacherMood"],
           ["学生", "studentFavor"],
+          ["年级组", "gradeTrust"],
         ];
   dom.hudStats.innerHTML = "";
   primaryStats.forEach(([label, statName]) => {
@@ -2275,6 +2380,10 @@ function renderHud() {
     chip.innerHTML = `<b>${value}/${max}</b><small>${label}</small>`;
     dom.hudStats.append(chip);
   });
+  const momentum = document.createElement("div");
+  momentum.className = "hud-chip momentum";
+  momentum.innerHTML = `<b>${game.momentum}/20</b><small>${game.route === "teacher" ? "教学声望" : "校园声望"}</small>`;
+  dom.hudStats.append(momentum);
 }
 
 function renderRoleScene() {
@@ -2528,6 +2637,9 @@ function closeCodex() {
 
 function renderLog() {
   if (!game) return;
+  const signature = game.log.join("\u001f");
+  if (dom.logList.dataset.signature === signature) return;
+  dom.logList.dataset.signature = signature;
   dom.logList.innerHTML = "";
   game.log.forEach((entry) => {
     const item = document.createElement("div");
@@ -2574,6 +2686,34 @@ function recordActionChronicle(action) {
   }
 }
 
+function actionCostShortfalls(action) {
+  if (!game) return [];
+  const effects = typeof action.costEffects === "function" ? action.costEffects() : action.effects;
+  if (!Array.isArray(effects)) return [];
+  const costs = effects.reduce((result, [statName, delta]) => {
+    const value = Number(delta);
+    if (value < 0 && Object.hasOwn(game.stats, statName)) {
+      result.set(statName, Number(result.get(statName) || 0) + Math.abs(value));
+    }
+    return result;
+  }, new Map());
+  return [...costs.entries()]
+    .filter(([statName, cost]) => Number(game.stats[statName] || 0) < cost)
+    .map(([statName, cost]) => ({ statName, cost, current: Number(game.stats[statName] || 0) }));
+}
+
+function actionDisabledState(action) {
+  const unavailable = Boolean(action.disabled?.());
+  const shortfalls = actionCostShortfalls(action);
+  if (shortfalls.length) {
+    return {
+      disabled: true,
+      reason: `属性不足：${shortfalls.map((item) => `${statLabel(item.statName)}需要 ${item.cost}，当前 ${item.current}`).join("；")}`,
+    };
+  }
+  return { disabled: unavailable, reason: unavailable ? "当前状态无法选择这项行动。" : "" };
+}
+
 function renderActions(title, subtitle, actions) {
   dom.actionTitle.textContent = title;
   dom.actionSubtitle.textContent = subtitle;
@@ -2586,14 +2726,16 @@ function renderActions(title, subtitle, actions) {
     const button = document.createElement("button");
     button.type = "button";
     button.className = `action-card${action.activityAction ? " activity-action" : ""}${action.featured ? " featured-action" : ""}`;
-    button.disabled = Boolean(action.disabled?.());
+    const disabledState = actionDisabledState(action);
+    button.disabled = disabledState.disabled;
+    if (disabledState.reason) button.title = disabledState.reason;
     const key = action.keyLabel || String.fromCharCode(65 + index);
     if (/^[A-Z]$/.test(key) && typeof button.setAttribute === "function") {
       button.setAttribute("aria-keyshortcuts", `${key} ${index + 1}`);
     }
     button.innerHTML = `
       <span class="action-key">${key}</span>
-      <span class="action-copy">${action.contextLabel ? `<span class="action-context">${action.contextLabel}</span>` : ""}<strong>${action.name}</strong><span>${action.detail || ""}</span>${renderActionEffects(action.effects, action.effectText)}</span>
+      <span class="action-copy">${action.contextLabel ? `<span class="action-context">${action.contextLabel}</span>` : ""}<strong>${action.name}</strong><span>${action.detail || ""}</span>${renderActionEffects(action.effects, action.effectText)}${disabledState.reason ? `<span class="action-lock-reason">${disabledState.reason}</span>` : ""}</span>
     `;
     button.addEventListener("click", () => {
       if (button.disabled) return;
@@ -2665,6 +2807,8 @@ function startWeekReset() {
   game.temp.lastLateRate = 0;
   game.temp.lastCaughtRate = 0;
   game.temp.zeroStaminaPenaltyAppliedThisWeek = false;
+  game.temp.weeklyEventCount = 0;
+  game.temp.weeklyEventLimitNoticeShown = false;
   game.temp.isFinalWeek = false;
   game.temp.choseGradeHomeworkThisWeek = false;
   game.temp.canChoosePhysicalAction = game.futurePhysicalActionBlockedWeeks <= 0;
@@ -2704,7 +2848,7 @@ function makeCampusActivityActions(phase) {
     return {
       id: actionId,
       name,
-      detail: `${activity[`${effectPhase}Detail`] || activity.brief} ${style.detail}`,
+      detail: style.detail,
       effects,
       featured: false,
       activityAction: true,
@@ -2789,6 +2933,7 @@ function triggerShopIfNeeded() {
   if (![4, 8].includes(game.week)) return null;
   return makeEvent({
     id: "event_special_shop",
+    ignoreWeeklyLimit: true,
     name: "特殊商店",
     type: "道具系统",
     description: "备用机\n\n手机检查时可选择“交出备用机”。\n若失败，惩罚加重。",
@@ -2797,7 +2942,7 @@ function triggerShopIfNeeded() {
         id: "choice_buy_backup_phone",
         name: "购买备用机",
         detail: "会消耗一些心情，但能在手机检查时多一层保险。",
-        disabled: () => hasItem("item_backup_phone") || (game.route === "student" && game.stats.mood <= 0),
+        disabled: () => hasItem("item_backup_phone") || (game.route === "student" && game.stats.mood < 2),
         run() {
           if (game.route === "student") applyStatChange("student", "mood", -2, "buy_backup_phone");
           if (game.route === "teacher") applyStatChange("teacher", "teacherMood", -2, "buy_backup_phone");
@@ -2860,7 +3005,24 @@ function chooseLunchAction() {
   dom.phaseLabel.textContent = "第二轮 · 校园活动";
   dom.roundState.textContent = activity.title;
   const actions = game.route === "student" ? getStudentLunchActions() : getTeacherLunchActions();
-  renderActions(`第二轮 · ${activity.title}`, `本轮只出现“${activity.title}”的专属选项。`, actions);
+  if (actions.every((action) => actionDisabledState(action).disabled)) {
+    const staminaStat = game.route === "teacher" ? "teacherStamina" : "stamina";
+    const moodStat = game.route === "teacher" ? "teacherMood" : "mood";
+    actions.push({
+      id: "activity_emergency_recovery",
+      name: game.route === "teacher" ? "退出现场，回办公室调整" : "退出现场，去医务室调整",
+      detail: "当所有方案都付不起成本时，先恢复到能继续做决定的状态。",
+      effects: [[staminaStat, 1], [moodStat, 1]],
+      activityAction: true,
+      contextLabel: activity.title,
+      run() {
+        applyEffects(game.route, [[staminaStat, 1], [moodStat, 1]], "activity_emergency_recovery");
+        addLog("你暂时离开了活动现场。活着回来也是项目管理的一部分。");
+        finishLunchAction();
+      },
+    });
+  }
+  renderActions(`第二轮 · ${activity.title}`, activity.secondDetail || activity.brief, actions);
 }
 
 function finishLunchAction() {
@@ -2876,6 +3038,7 @@ function runPostLunchChecks() {
   if (common) queue.push(common);
   const schoolEvent = window.Schooltopia?.maybeCreateEvent?.(game, {
     randomChance,
+    eventChance: (chance) => difficultyChance(chance, "event"),
     makeEvent,
     applyStatChange,
     addLog,
@@ -3020,6 +3183,7 @@ function getAllStudentDailyActions() {
       name: "刷题",
       detail: "提升智慧，但会消耗心情；连续三周选择刷题可获得《刷题机器》。",
       effects: [["wisdom", 1], ["mood", -1]],
+      costEffects: () => game.temp.nextDailyStudyNoMoodCost ? [] : [["mood", -1]],
       run() {
         updateStudentDailyActionStreaks("action_daily_study");
         applyStatChange("student", "wisdom", 1, "action_daily_study");
@@ -3141,6 +3305,13 @@ function getAllTeacherDailyActions() {
       name: "批作业",
       detail: "提升教学威严，但会明显消耗体能；批得够多会获得《红笔熟练工》。",
       effects: [["authority", 1], ["teacherStamina", -2]],
+      costEffects: () => [[
+        "teacherStamina",
+        -Math.max(
+          0,
+          2 - (hasTitle("title_red_pen_skilled_worker") ? 1 : 0) - game.temp.nextGradeHomeworkStaminaCostReduction
+        ),
+      ]],
       disabled: () => hasStatus("status_red_pen_unusable"),
       run() {
         updateTeacherDailyActionStreaks("action_grade_homework");
@@ -3531,17 +3702,30 @@ function canTriggerEvent(eventId, source = "direct") {
 
 function runEventQueue(queue, onDone) {
   const events = queue.filter(Boolean);
+  let shownCount = 0;
   const next = () => {
     if (game.gameEnded) return;
     const event = events.shift();
     if (!event) {
-      onDone();
+      onDone(shownCount);
       return;
     }
     if (!canTriggerEvent(event.id, event.source || "direct")) {
       next();
       return;
     }
+    const limit = difficultyConfig(game.difficulty).weeklyEventLimit || 2;
+    const usesWeeklyLimit = !event.ignoreWeeklyLimit && !game.temp.isFinalWeek;
+    if (usesWeeklyLimit && game.temp.weeklyEventCount >= limit) {
+      if (!game.temp.weeklyEventLimitNoticeShown) {
+        game.temp.weeklyEventLimitNoticeShown = true;
+        addLog(`本周随机事件已达上限（${limit}），其余事件顺延到命运的未读消息里。`);
+      }
+      next();
+      return;
+    }
+    if (usesWeeklyLimit) game.temp.weeklyEventCount += 1;
+    shownCount += 1;
     game.currentWeekTriggeredEventIds.add(event.id);
     openEvent(event, next);
   };
@@ -4804,10 +4988,12 @@ function determineFinalEnding() {
   if (game.gameEnded) return game.currentEnding;
   const endings = collectAvailableEndings();
   if (!endings.length) {
+    game.eligibleEndings = ["ending_ordinary_graduate"];
     triggerEnding("ending_ordinary_graduate");
     return game.currentEnding;
   }
   endings.sort((a, b) => ENDINGS[b].priority - ENDINGS[a].priority);
+  game.eligibleEndings = [...new Set(endings)];
   const topEnding = endings[0];
   if (topEnding === "ending_ivy_admission") {
     runIvyChoiceFlow();
@@ -4993,29 +5179,69 @@ function renderEndingChronicle() {
   dom.endingChronicle.innerHTML = "";
   if (!weeks.length) {
     const item = document.createElement("li");
-    const week = document.createElement("span");
+    const details = document.createElement("details");
+    details.open = true;
+    const week = document.createElement("summary");
     week.className = "chronicle-week";
     week.textContent = `第 ${game.week} 周`;
     const lines = document.createElement("div");
     lines.className = "chronicle-lines";
     appendChronicleLine(lines, "命运", "还没来得及选择，结局先到了。");
-    item.append(week, lines);
+    details.append(week, lines);
+    item.append(details);
     dom.endingChronicle.append(item);
     return;
   }
-  weeks.forEach((entry) => {
+  weeks.forEach((entry, index) => {
     const item = document.createElement("li");
-    const week = document.createElement("span");
+    const details = document.createElement("details");
+    details.open = index === 0 || index === weeks.length - 1;
+    const week = document.createElement("summary");
     week.className = "chronicle-week";
-    week.textContent = `第 ${entry.week} 周`;
+    const lineCount = Number(Boolean(entry.daily)) + Number(Boolean(entry.activity)) + entry.events.length;
+    week.textContent = `第 ${entry.week} 周 · ${lineCount} 条记录`;
     const lines = document.createElement("div");
     lines.className = "chronicle-lines";
     if (entry.daily) appendChronicleLine(lines, "日常", entry.daily.choice);
     if (entry.activity) appendChronicleLine(lines, "活动", `${entry.activity.title} · ${entry.activity.choice}`);
     entry.events.forEach((event) => appendChronicleLine(lines, "事件", `${event.title} · ${event.choice}`));
-    item.append(week, lines);
+    details.append(week, lines);
+    item.append(details);
     dom.endingChronicle.append(item);
   });
+}
+
+const SCORE_BREAKDOWN_LABELS = {
+  stats: "最终属性",
+  survival: "存活周数",
+  achievements: "成就",
+  titles: "称号",
+  difficulty: "难度",
+  momentum: "声望",
+};
+
+function renderScoreBreakdown(report) {
+  dom.scoreBreakdown.innerHTML = "";
+  Object.entries(report.breakdown || {}).forEach(([key, value]) => {
+    const item = document.createElement("span");
+    item.innerHTML = `<small>${SCORE_BREAKDOWN_LABELS[key] || key}</small><b>+${value}</b>`;
+    dom.scoreBreakdown.append(item);
+  });
+  if (report.rawScore > 100) {
+    const cap = document.createElement("p");
+    cap.textContent = `原始总分 ${report.rawScore}，总评最高记为 100。`;
+    dom.scoreBreakdown.append(cap);
+  }
+}
+
+function renderEndingAlternatives(endingId) {
+  const alternatives = [...new Set(game.eligibleEndings || [])]
+    .filter((id) => id !== endingId && ENDINGS[id])
+    .map((id) => ENDINGS[id].title);
+  dom.endingAlternatives.classList.toggle("hidden", alternatives.length === 0);
+  dom.endingAlternatives.innerHTML = alternatives.length
+    ? `<small>本局同时达成</small><strong>${alternatives.join(" · ")}</strong>`
+    : "";
 }
 
 function chooseInheritedMemory(candidate, endingId, endingTitle) {
@@ -5062,11 +5288,14 @@ function renderRunRecap(endingId, endingTitle) {
     titles: game.titles,
     endingId,
     chronicle: game.chronicle,
+    momentum: game.momentum,
   }) || { score: 0, rarityId: "common", verdictId: "story" };
   dom.endingScore.textContent = String(report.score);
   dom.endingRarity.textContent = ENDING_RARITY_LABELS[report.rarityId] || ENDING_RARITY_LABELS.common;
   dom.endingRarity.dataset.rarity = report.rarityId;
   dom.endingVerdict.textContent = ENDING_VERDICTS[report.verdictId] || ENDING_VERDICTS.story;
+  renderScoreBreakdown(report);
+  renderEndingAlternatives(endingId);
   dom.memoryStatus.textContent = "";
   dom.restartGame.textContent = "重新开始";
   renderEndingChronicle();
@@ -5092,7 +5321,7 @@ function triggerEnding(endingId) {
   dom.endingText.append(endingCopy);
   const prompt = document.createElement("div");
   prompt.className = "final-prompt";
-  prompt.textContent = TEXT.finalPrompt;
+  prompt.textContent = finalPromptText();
   dom.endingText.append(prompt);
   renderRunRecap(endingId, ending.title);
   window.Schooltopia?.endSession?.(game, endingId, ending.title);
@@ -5110,6 +5339,7 @@ function drawCampus() {
   let frame = 0;
   let animationId = 0;
   let reducedMotion = Boolean(motionQuery?.matches);
+  let inViewport = true;
   let particles = [];
 
   function resize() {
@@ -5431,20 +5661,24 @@ function drawCampus() {
 
     drawFloatingSign(t);
 
-    if (!reducedMotion && !document.hidden) {
+    if (!reducedMotion && !document.hidden && inViewport) {
       animationId = requestAnimationFrame(render);
     }
+  }
+
+  function syncAnimation() {
+    const shouldAnimate = !reducedMotion && !document.hidden && inViewport;
+    if (!shouldAnimate && animationId) {
+      cancelAnimationFrame(animationId);
+      animationId = 0;
+    }
+    if (shouldAnimate && !animationId) render();
   }
 
   resize();
   window.addEventListener("resize", resize);
   document.addEventListener("visibilitychange", () => {
-    if (document.hidden) {
-      if (animationId) cancelAnimationFrame(animationId);
-      animationId = 0;
-      return;
-    }
-    if (!reducedMotion && !animationId) render();
+    syncAnimation();
   });
   motionQuery?.addEventListener?.("change", (event) => {
     reducedMotion = event.matches;
@@ -5452,6 +5686,13 @@ function drawCampus() {
     animationId = 0;
     render();
   });
+  if (typeof IntersectionObserver === "function") {
+    const observer = new IntersectionObserver((entries) => {
+      inViewport = Boolean(entries[0]?.isIntersecting);
+      syncAnimation();
+    }, { threshold: 0.01 });
+    observer.observe(canvas);
+  }
   render();
 }
 
@@ -5474,6 +5715,7 @@ document.addEventListener("visibilitychange", () => {
 });
 dom.startGame.addEventListener("click", startGame);
 dom.recommendedSetup.addEventListener("click", applyRecommendedSetup);
+dom.resetAllGameData.addEventListener("click", resetAllGameData);
 dom.clearInheritedMemory.addEventListener("click", clearInheritedMemory);
 dom.restartGame.addEventListener("click", resetGame);
 dom.restartInGame.addEventListener("click", confirmRestartInGame);
